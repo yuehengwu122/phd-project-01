@@ -1,0 +1,72 @@
+---
+title: "Application 1: Neuroscience, Facebook Friends Versus Gray Matter"
+format: html
+execute:
+  message: false
+  warning: false
+  cache: true
+---
+
+```{r}
+#| label: setup
+source("_common.R")
+```
+
+## Data Loading
+```{r}
+library(Lock5Data)
+data(FacebookFriends)
+dim(FacebookFriends)
+X <- sqrt(FacebookFriends$FBfriends) |> rescale_to_range1() |> matrix(ncol = 1)
+y <- FacebookFriends$GMdensity
+```
+
+## Model Fitting
+```{r}
+fit_gp_p1 <- fit_model(
+        gp_add_p1_11,
+        data = list(N = nrow(X), y = y, P = ncol(X), X = X),
+        chains = 2,
+        iter = 5000,
+        warmup = 500
+      )
+
+fit_null <- fit_model(
+        gp_null, 
+        data = list(N = nrow(X), y = y, P = ncol(X), X = X),
+        iter = 5000,
+        warmup = 500
+      )
+```
+
+```{r}
+fit_gp_p1 <- fit_model(
+        gp_add_p1_12,
+        data = list(N = nrow(X), y = y, P = ncol(X), X = X),
+        chains = 2,
+        iter = 5000,
+        warmup = 500
+      )
+```
+
+## Results & Diagnostics
+```{r}
+print_quick_summary(fit_gp_p1)
+```
+
+## Visualizations
+```{r}
+plot_posterior(fit_gp_p1)
+plot_gp_trends(fit_gp_p1)
+```
+
+
+## Savage-Dickey Ratios
+```{r}
+compute_savage_dickey_ratios(fit_gp_p1)
+```
+
+
+```{r}
+compute_bayes_factor(fit_gp_p1$fit, fit_null$fit)
+```

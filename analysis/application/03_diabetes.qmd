@@ -1,0 +1,180 @@
+---
+title: "Application 3: Diabetes"
+format: html
+execute:
+  message: false
+  warning: false
+  cache: true
+---
+
+```{r}
+#| label: setup
+source("_common.R")
+```
+
+## Data Loading
+
+```{r}
+library("care")
+data(efron2004)
+dim(efron2004$x) # 442 10
+colnames(efron2004$x)
+
+x_mat <- as.matrix(efron2004$x)   
+class(x_mat) <- "matrix"        
+
+X <- x_mat[,-2]         # remove "sex" (a binary variable)
+y <- efron2004$y[,1]
+
+fit_data <- list(
+  N=nrow(X),
+  y = y,
+  P = ncol(X), 
+  X = apply(X, 2, rescale_to_range1), 
+  M = 40
+)
+```
+
+## Exploratory Visualizations
+
+Marginal scatter plots and GAM smooth for each predictor -\> inspect nonlinear relationships. The blue curve is a mgcv::gam fit (`y ~ s(x, bs = 'cs')`, a penalized cubic spline basis) with a 95% pointwise confidence band. Each facet fits its own smoother.
+
+```{r}
+df <- as.data.frame(cbind(y, X))
+df |> 
+  gather(key, val, -y) %>%
+  ggplot(aes(x = val, y = y)) +
+  geom_point() +
+  stat_smooth(method = "gam", se = TRUE, col = "blue") +
+  facet_wrap(~key, scales = "free") +
+  theme_gray() +
+  ggtitle("Marginal scatter plot") 
+```
+
+## Model Fitting
+### independent priors on standardized coefficients theta
+```{r}
+fit_a3_indep <- fit_model(
+        gp_add_p1_13,
+        data = fit_data,
+        chains = 2,
+        iter = 5500,
+        warmup = 500
+)
+# saveRDS(fit_a3_indep, file = "analysis/application/fits/fit_a3_indep.rds")
+# fit_a3_indep <- readRDS("analysis/application/fits/fit_a3_indep.rds")
+```
+
+### dependent prior on theta
+```{r}
+fit_a3_dep <- fit_model(
+        gp_add_p1_14,
+        data = fit_data,
+        chains = 2,
+        iter = 5500,
+        warmup = 500
+)
+# saveRDS(fit_a3_dep, file = "analysis/application/fits/fit_a3_dep.rds")
+# fit_a3_dep <- readRDS("analysis/application/fits/fit_a3_dep.rds")
+```
+
+## Results & Diagnostics
+```{r}
+print_quick_summary(fit_a3_indep)
+print_quick_summary(fit_a3_dep, key_params = c("delta", "lambda", "sigma", "mu", "beta"))
+```
+
+
+```{r}
+plot_posterior(fit_a3_indep)
+plot_posterior(fit_a3_dep)
+
+plot_gp_trends(fit_a3_indep, model_name="exact-GP / marginal-θ")
+plot_gp_trends(fit_a3_dep, model_name="exact-GP / multivariate-θ",ylim=c(-3,3))
+```  
+
+## BF: Savage-Dickey density ratios
+```{r}
+compute_savage_dickey_ratios(fit_a3_indep)
+compute_savage_dickey_ratios(fit_a3_dep)
+```
+
+
+=========================================================================================
+## HSGP approximation
+```{r}
+time_hsgp_a3 <- system.time({
+fit_a3_indep_hsgp <- fit_model(
+        gp_hsgp_02,
+        data = fit_data,
+        chains = 2,
+        iter = 5500,
+        warmup = 500
+      )
+})
+
+fit_a3_dep_hsgp <- fit_model(
+        gp_hsgp_01,
+        data = fit_data,
+        chains = 2,
+        iter = 5500,
+        warmup = 500
+      )
+
+```
+
+```{r}
+print_quick_summary(fit_a3_indep_hsgp)
+print_quick_summary(fit_a3_dep_hsgp)
+```
+
+```{r}
+compute_savage_dickey_ratios(fit_a3_indep_hsgp)
+compute_savage_dickey_ratios(fit_a3_dep_hsgp)
+```
+
+```{r}
+plot_hsgp_trends(fit_a3_indep_hsgp, model_name="HSGP / marginal-θ")
+plot_hsgp_trends(fit_a3_dep_hsgp, model_name="HSGP / multivariate-θ", ylim=c(-3,3))
+```
+
+=========================================================================================
+## Compare with GAM
+```{r}
+library(mgcv)
+
+# Fit GAM with same structure as GP model: y = linear + smooth terms
+# This matches the GP structure: y = beta0 + X*beta1 + f1(x1) + ... + f9(x9)
+
+# Create data frame for GAM
+gam_data <- data.frame(
+  y = y,
+  X  # X is already scaled from fit_data
+)
+# Make sure column names match the original predictor names
+colnames(gam_data)[-1] <- colnames(efron2004$x)[-2]  # Remove "sex" column
+
+# Fit GAM with linear + smooth terms for each predictor
+# s(xi, fx=FALSE) allows the smoother to determine its own complexity
+gam_fit_time <- system.time({
+  gam_fit <- gam(y ~ age + bmi + bp + s1 + s2 + s3 + s4 + s5 + s6 +
+                     s(age) + s(bmi) + s(bp) + s(s1) + s(s2) + 
+                     s(s3) + s(s4) + s(s5) + s(s6),
+                 data = gam_data,
+                 method = "REML")
+})
+
+# Summary of GAM fit
+summary(gam_fit)
+
+# Display time taken
+gam_fit_time
+```
+
+- plot see `/Users/ywu/Documents/phd-project-01/experiments/260107_gam_diabetes.R`
+
+
+```{r}
+bridgesampling::bridge_sampler(try_fit)
+bridgesampling::bridge_sampler(fit_a3_indep_hsgp$fit)
+```

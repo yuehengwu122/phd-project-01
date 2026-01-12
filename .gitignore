@@ -1,0 +1,27 @@
+.RData
+.Rhistory
+.Rproj.user
+
+# R package builds
+*.tar.gz
+
+# Stan compilation outputs
+*.so
+*.dll
+*.exe
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+*.Rproj
+
+# Cache directories
+*_cache/
+*_files/
+
+# Output files
+*.html
+*.pdf
