@@ -79,7 +79,7 @@ cat("Compiling Stan models...\n")
 
 # Four model variants to compare
 exactgp_indep <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p1_13.stan")
-exactgp_multi <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p1_15.stan")  # Note: using 14 for multivariate
+exactgp_multi <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p1_15.stan")
 hsgp_indep <- rstan::stan_model(file = "stan/multiple_gp/fit_add_hsgp_02.stan")
 hsgp_multi <- rstan::stan_model(file = "stan/multiple_gp/fit_add_hsgp_01.stan")
 
