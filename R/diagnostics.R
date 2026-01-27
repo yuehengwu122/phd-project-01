@@ -82,7 +82,7 @@ print_quick_summary <- function(result, key_params = c("delta", "lambda", "sigma
 # Plot Functions
 # ============================================================
 
-#' Plot Posterior Distribution
+#' Plot Posterior Distribution of Delta
 #' @param result Result object from run_analysis()
 #' @param param Parameter name to plot (default: "delta")
 #' @param xlim Custom x-axis limits (default: NULL, auto)
@@ -90,13 +90,19 @@ print_quick_summary <- function(result, key_params = c("delta", "lambda", "sigma
 #' @param bins Number of histogram bins (default: 30)
 #' @param trim_quantile Quantile threshold for trimming heavy tails (default: 1, no trimming)
 #' @param model_name Optional model name to display in title (default: NULL, uses result$model_name)
-plot_posterior <- function(result, 
+#' @param plot_prior Logical, if TRUE plot the prior density curve (default: FALSE)
+#' @param prior_scale Scale parameter for half-normal prior (default: 1)
+#' @param ylim Custom y-axis limits (default: NULL, auto)
+plot_posterior_delta <- function(result, 
                           param = "delta", 
                           xlim = NULL,
+                          ylim = NULL,
                           predictor_names = NULL,
                           bins = 30,
                           trim_quantile = 1,
-                          model_name = NULL) {
+                          model_name = NULL,
+                          plot_prior = FALSE,
+                          prior_scale = 1) {
   
   fit <- result$fit
   draws <- rstan::extract(fit)[[param]]
@@ -104,7 +110,7 @@ plot_posterior <- function(result,
   if (is.null(draws)) {
     stop(sprintf("Parameter '%s' not found in fit object.", param))
   }
-  
+
   # Trim data based on quantile threshold
   if (trim_quantile < 1) {
     if (is.matrix(draws)) {
@@ -131,13 +137,30 @@ plot_posterior <- function(result,
     plot_title <- title_line1
   }
   
+  # Common theme settings
+  common_theme <- theme_minimal() +
+    theme(
+      plot.title = element_text(size = 11, face = "bold"),
+      strip.text = element_text(face = "bold"),
+      panel.grid = element_blank(),
+      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+    )
+  
+  # Helper function for half-t prior density
+  half_t_density <- function(x) {
+    (1/2.7) * dt(x/2.7, df = 4) * 2
+  }
+  
   # Handle vector vs scalar parameter
   if (is.matrix(draws)) {
     P <- ncol(draws)
     
-    # Set predictor names
+    # Set predictor names from data
     if (is.null(predictor_names)) {
-      predictor_names <- paste0(param, "[", 1:P, "]")
+      predictor_names <- colnames(result$data$X)
+      if (is.null(predictor_names)) {
+        predictor_names <- paste0(param, "[", 1:P, "]")
+      }
     }
     
     # Convert to long format
@@ -148,33 +171,210 @@ plot_posterior <- function(result,
     draws_df$predictor <- factor(draws_df$predictor, levels = predictor_names)
     
     p <- ggplot(draws_df, aes(x = value)) +
-      geom_histogram(aes(y = after_stat(density)), bins = bins, fill = "steelblue", alpha = 0.6, color = "black") +
-      facet_wrap(~ predictor, scales = "free") +  # Each predictor gets its own axis
-      labs(title = plot_title,
-           x = param, y = "Density") +
-      theme_minimal() +
-      theme(plot.title = element_text(size = 11))
+      geom_histogram(aes(y = after_stat(density)), bins = bins, fill = "black", alpha=0.6, color = "white") +
+      facet_wrap(~ predictor, scales = "free", ncol = 3) +
+      labs(title = plot_title, x = param, y = "Density") +
+      common_theme
+    
+    # Add prior density curve if requested
+    if (plot_prior) {
+      prior_df <- do.call(rbind, lapply(predictor_names, function(pn) {
+        x_range <- range(draws_df$value[draws_df$predictor == pn], na.rm = TRUE)
+        x_seq <- seq(0, x_range[2], length.out = 200)
+        data.frame(x = x_seq, y = half_t_density(x_seq), 
+                   predictor = factor(pn, levels = predictor_names))
+      }))
+      
+      p <- p + geom_line(data = prior_df, aes(x = x, y = y), 
+                         color = "red", linewidth = 0.8) +
+        geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.4)
+    }
     
   } else {
     # Scalar parameter
     draws_df <- data.frame(value = draws)
     
     p <- ggplot(draws_df, aes(x = value)) +
-      geom_histogram(aes(y = after_stat(density)), bins = bins, fill = "steelblue", alpha = 0.6, color = "black") +
+      geom_histogram(aes(y = after_stat(density)), bins = bins, fill = "black", alpha=0.6, color = "white") +
       geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
-      labs(title = plot_title,
-           x = param, y = "Density") +
-      theme_minimal() +
-      theme(plot.title = element_text(size = 11))
+      labs(title = plot_title, x = param, y = "Density") +
+      common_theme
+    
+    # Add prior density curve if requested
+    if (plot_prior) {
+      x_seq <- seq(0, max(draws_df$value, na.rm = TRUE), length.out = 200)
+      prior_df <- data.frame(x = x_seq, y = half_t_density(x_seq))
+      p <- p + geom_line(data = prior_df, aes(x = x, y = y), 
+                         color = "red", linewidth = 0.8) +
+        geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.4)
+    }
   }
   
-  # Apply custom xlim if provided
-  if (!is.null(xlim)) {
-    p <- p + coord_cartesian(xlim = xlim)
+  # Apply custom xlim and ylim if provided
+  if (!is.null(xlim) || !is.null(ylim)) {
+    p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
   }
   
   p
 }
+
+
+#' Plot Posterior Distribution of Theta (Linear Coefficients)
+#' @param result Result object from run_analysis()
+#' @param param Parameter name to plot (default: "theta")
+#' @param xlim Custom x-axis limits (default: NULL, auto)
+#' @param predictor_names Optional names for predictors
+#' @param bins Number of histogram bins (default: 30)
+#' @param trim_quantile Quantile threshold for trimming heavy tails (default: 1, no trimming)
+#' @param model_name Optional model name to display in title (default: NULL, uses result$model_name)
+#' @param plot_prior Logical, if TRUE plot the prior density curve (default: FALSE)
+#' @param ylim Custom y-axis limits (default: NULL, auto)
+plot_posterior_theta <- function(result, 
+                          param = "theta", 
+                          xlim = NULL,
+                          ylim = NULL,
+                          predictor_names = NULL,
+                          bins = 30,
+                          trim_quantile = 1,
+                          model_name = NULL,
+                          plot_prior = FALSE) {
+  
+  fit <- result$fit
+  draws <- rstan::extract(fit)[[param]]
+  
+  if (is.null(draws)) {
+    stop(sprintf("Parameter '%s' not found in fit object.", param))
+  }
+
+  # Trim data based on quantile threshold (symmetric trimming for theta)
+  if (trim_quantile < 1) {
+    lower_q <- (1 - trim_quantile) / 2
+    upper_q <- 1 - lower_q
+    if (is.matrix(draws)) {
+      draws <- apply(draws, 2, function(x) {
+        x[x >= quantile(x, lower_q) & x <= quantile(x, upper_q)]
+      })
+    } else {
+      draws <- draws[draws >= quantile(draws, lower_q) & draws <= quantile(draws, upper_q)]
+    }
+  }
+  
+  # Create plot title with model name
+  if (is.null(model_name)) {
+    model_name <- result$model_name
+  }
+  
+  if (!is.null(model_name)) {
+    title_line1 <- paste0(model_name, ": Posterior of ", param)
+  } else {
+    title_line1 <- paste0("Posterior of ", param)
+  }
+  
+  if (trim_quantile < 1) {
+    plot_title <- paste0(title_line1, "\n(trimmed at ", sprintf("%.0f%%", trim_quantile * 100), ")")
+  } else {
+    plot_title <- title_line1
+  }
+  
+  # Common theme settings
+  common_theme <- theme_minimal() +
+    theme(
+      plot.title = element_text(size = 11, face = "bold"),
+      strip.text = element_text(face = "bold"),
+      panel.grid = element_blank(),
+      panel.border = element_rect(color = "black", fill = NA, linewidth = 0.5)
+    )
+  
+  # Handle vector vs scalar parameter
+  if (is.matrix(draws)) {
+    P <- ncol(draws)
+    
+    # Set predictor names from data
+    if (is.null(predictor_names)) {
+      predictor_names <- colnames(result$data$X)
+      if (is.null(predictor_names)) {
+        predictor_names <- paste0(param, "[", 1:P, "]")
+      }
+    }
+    
+    # Convert to long format
+    draws_df <- data.frame(
+      value = as.vector(draws),
+      predictor = rep(predictor_names, each = length(draws[, 1]))
+    )
+    draws_df$predictor <- factor(draws_df$predictor, levels = predictor_names)
+    
+    p <- ggplot(draws_df, aes(x = value)) +
+      geom_histogram(aes(y = after_stat(density)), bins = bins, fill = "black", alpha = 0.6, color = "white") +
+      facet_wrap(~ predictor, scales = "free", ncol = 3) +
+      labs(title = plot_title, x = param, y = "Density") +
+      common_theme
+    
+    # Add prior density curve if requested
+    if (plot_prior) {
+      # Get prior scales using compute_prior_density_theta logic
+      X <- result$data$X
+      N <- nrow(X)
+      X_c <- scale(X, center = TRUE, scale = FALSE)
+      scales_theta <- apply(X_c, 2, function(x_col) {
+        sqrt(N) / sqrt(sum(x_col^2))
+      })
+      
+      # Create prior data for each predictor (Cauchy prior)
+      prior_df <- do.call(rbind, lapply(seq_along(predictor_names), function(j) {
+        pn <- predictor_names[j]
+        x_range <- range(draws_df$value[draws_df$predictor == pn], na.rm = TRUE)
+        # Ensure x_seq includes 0
+        x_min <- min(x_range[1], 0)
+        x_max <- max(x_range[2], 0)
+        x_seq <- seq(x_min, x_max, length.out = 200)
+        # Cauchy density centered at 0 with scale from JZS prior
+        y_seq <- dcauchy(x_seq, location = 0, scale = scales_theta[j])
+        data.frame(x = x_seq, y = y_seq, predictor = factor(pn, levels = predictor_names))
+      }))
+      
+      p <- p + geom_line(data = prior_df, aes(x = x, y = y), 
+                         color = "red", linewidth = 0.8) +
+        geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.4)
+    }
+    
+  } else {
+    # Scalar parameter
+    draws_df <- data.frame(value = draws)
+    
+    p <- ggplot(draws_df, aes(x = value)) +
+      geom_histogram(aes(y = after_stat(density)), bins = bins, fill = "black", alpha = 0.6, color = "white") +
+      geom_vline(xintercept = 0, linetype = "dashed", color = "red") +
+      labs(title = plot_title, x = param, y = "Density") +
+      common_theme
+    
+    # Add prior density curve if requested
+    if (plot_prior) {
+      X <- result$data$X
+      N <- nrow(X)
+      X_c <- scale(X, center = TRUE, scale = FALSE)
+      scale_theta <- sqrt(N) / sqrt(sum(X_c^2))
+      
+      x_range <- range(draws_df$value, na.rm = TRUE)
+      # Ensure x_seq includes 0
+      x_min <- min(x_range[1], 0)
+      x_max <- max(x_range[2], 0)
+      x_seq <- seq(x_min, x_max, length.out = 200)
+      prior_df <- data.frame(x = x_seq, y = dcauchy(x_seq, location = 0, scale = scale_theta))
+      p <- p + geom_line(data = prior_df, aes(x = x, y = y), 
+                         color = "red", linewidth = 0.8) +
+        geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.4)
+    }
+  }
+  
+  # Apply custom xlim and ylim if provided
+  if (!is.null(xlim) || !is.null(ylim)) {
+    p <- p + coord_cartesian(xlim = xlim, ylim = ylim)
+  }
+  
+  p
+}
+
 
 
 #' Plot Estimated GP Trends
@@ -289,6 +489,7 @@ plot_gp_trends_old <- function(result,
 #' Plot GP Trends for Exact GP Model
 #' @param result Result object from run_analysis()
 #' @param X Predictor matrix (N x P), should match the data used for fitting
+#' @param X_orig Original (unscaled) predictor matrix for plotting x-axis (default: NULL, uses X)
 #' @param predictor_names Optional names for predictors
 #' @param p Optional vector of predictor indices to plot (default: all)
 #' @param N_grid Number of grid points for prediction (default: 50)
@@ -298,6 +499,7 @@ plot_gp_trends_old <- function(result,
 #' @param ylim Optional y-axis limits as a numeric vector of length 2 (default: NULL, auto)
 plot_gp_trends <- function(result,
                            X = NULL,
+                           X_orig = NULL,
                            predictor_names = NULL,
                            p = NULL,
                            N_grid = 50,
@@ -310,6 +512,14 @@ plot_gp_trends <- function(result,
   if (is.null(X)) X <- result$data$X
   if (is.vector(X)) X <- matrix(X, ncol = 1)
   X <- as.matrix(X)
+  
+  # Use X_orig for plotting if provided, otherwise use X
+  if (is.null(X_orig)) {
+    X_plot <- X
+  } else {
+    if (is.vector(X_orig)) X_orig <- matrix(X_orig, ncol = 1)
+    X_plot <- as.matrix(X_orig)
+  }
 
   N <- nrow(X)
   P <- ncol(X)
@@ -415,10 +625,14 @@ plot_gp_trends <- function(result,
     i <- p_idx[kk]
     x_name <- predictor_names[i]
     
-    # grid in raw scale
+    # grid in rescaled scale (for model calculations)
     x_i <- X[, i]
     xg_raw <- seq(min(x_i), max(x_i), length.out = N_grid)
     xg_c   <- xg_raw - x_bar[i]
+    
+    # grid in original scale (for plotting)
+    x_i_plot <- X_plot[, i]
+    xg_plot <- seq(min(x_i_plot), max(x_i_plot), length.out = N_grid)
 
     # grid-side Qn, Rn for projector span{1, xg_c}
     Qn <- cbind(rep(1, N_grid), xg_c)
@@ -486,7 +700,7 @@ plot_gp_trends <- function(result,
 
     out_list[[kk]] <- data.frame(
       predictor = factor(x_name, levels = predictor_names[p_idx]),
-      x = xg_raw,
+      x = xg_plot,
       full_mean = full_mean,
       full_lo = full_lower,
       full_hi = full_upper,
@@ -495,7 +709,7 @@ plot_gp_trends <- function(result,
 
     raw_list[[kk]] <- data.frame(
       predictor = factor(x_name, levels = predictor_names[p_idx]),
-      x = X[, i],
+      x = X_plot[, i],
       y = y
     )
   }
@@ -559,6 +773,7 @@ phi_grid_ortho <- function(x_c, M, L) {
 
 #' Plot HSGP Trends
 #' @param object Result object from run_analysis()
+#' @param X_orig Original (unscaled) predictor matrix for plotting x-axis (default: NULL, uses X)
 #' @param p Optional vector of predictor indices to plot (default: all)
 #' @param N_grid Number of grid points for prediction (default: 50)
 #' @param ndraws Number of posterior draws to use (default: 1000)
@@ -566,7 +781,7 @@ phi_grid_ortho <- function(x_c, M, L) {
 #' @param predictor_names Optional names for predictors
 #' @param model_name Optional model name to display in title (default: NULL, uses object$model_name)
 #' @param ylim Optional y-axis limits as a numeric vector of length 2 (default: NULL, auto)
-plot_hsgp_trends <- function(object, p = NULL, N_grid = 50, ndraws = 1000, seed = 1,
+plot_hsgp_trends <- function(object, X_orig = NULL, p = NULL, N_grid = 50, ndraws = 1000, seed = 1,
                              predictor_names = NULL, model_name = NULL, ylim = NULL) {
 
   fit <- object$fit
@@ -575,6 +790,14 @@ plot_hsgp_trends <- function(object, p = NULL, N_grid = 50, ndraws = 1000, seed 
   M   <- object$data$M
 
   N <- nrow(X); P <- ncol(X)
+  
+  # Use X_orig for plotting if provided, otherwise use X
+  if (is.null(X_orig)) {
+    X_plot <- X
+  } else {
+    if (is.vector(X_orig)) X_orig <- matrix(X_orig, ncol = 1)
+    X_plot <- as.matrix(X_orig)
+  }
 
   if (is.null(p)) p_idx <- seq_len(P) else p_idx <- as.integer(p)
 
@@ -609,10 +832,13 @@ plot_hsgp_trends <- function(object, p = NULL, N_grid = 50, ndraws = 1000, seed 
     half_range <- 0.5 * (max(xcp) - min(xcp))
     Lp <- max(1e-6, 1.5 * half_range)
 
-    # grid
+    # grid in rescaled scale (for model calculations)
     x_grid_raw <- seq(min(X[, pp]), max(X[, pp]), length.out = N_grid)
     x_grid_c   <- x_grid_raw - x_bar[pp]
     PHI_g      <- phi_grid_ortho(x_grid_c, M, Lp)
+    
+    # grid in original scale (for plotting)
+    x_grid_plot <- seq(min(X_plot[, pp]), max(X_plot[, pp]), length.out = N_grid)
 
     theta_p  <- post$theta[idx, pp]
     delta_p  <- post$delta[idx, pp]
@@ -645,7 +871,7 @@ plot_hsgp_trends <- function(object, p = NULL, N_grid = 50, ndraws = 1000, seed 
 
     out_list[[kk]] <- data.frame(
       predictor = factor(x_name, levels = predictor_names[p_idx]),
-      x = x_grid_raw,
+      x = x_grid_plot,
       full_mean = colMeans(full_mat),
       full_lo = apply(full_mat, 2, quantile, 0.025),
       full_hi = apply(full_mat, 2, quantile, 0.975),
@@ -654,7 +880,7 @@ plot_hsgp_trends <- function(object, p = NULL, N_grid = 50, ndraws = 1000, seed 
 
     raw_list[[kk]] <- data.frame(
       predictor = factor(x_name, levels = predictor_names[p_idx]),
-      x = X[, pp],
+      x = X_plot[, pp],
       y = y
     )
   }

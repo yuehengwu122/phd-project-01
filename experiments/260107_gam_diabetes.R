@@ -105,6 +105,8 @@ gam_fit_time <- system.time({
                  method = "REML")
 })
 
+summary(gam_fit)
+
 # Plot GAM smooth functions for separated linear + nonlinear model
 par(mfrow = c(3, 3), mar = c(3, 3, 2, 1), oma = c(0, 0, 0, 0))
 
@@ -162,3 +164,78 @@ gam_fit_time <- system.time({
                  method = "REML")
 })
 
+
+
+
+##### tow step model: linear first, then smooth on residuals
+# Step 1: Fit a linear model
+lm_fit <- lm(y ~ age + bmi + bp + s1 + s2 + s3 + s4 + s5 + s6, data = gam_data)
+
+# Step 2: Compute residuals from the linear model
+gam_data$residuals <- residuals(lm_fit)
+
+# Step 3: Fit a GAM on the residuals
+gam_fit_residuals <- gam(
+  residuals ~ s(age, bs = "tp") + s(bmi, bs = "tp") + s(bp, bs = "tp") +
+    s(s1, bs = "tp") + s(s2, bs = "tp") + s(s3, bs = "tp") +
+    s(s4, bs = "tp") + s(s5, bs = "tp") + s(s6, bs = "tp"),
+  data = gam_data,
+  method = "REML"
+)
+
+# Step 4: Plot everything
+par(mfrow = c(3, 3), mar = c(4, 4, 2, 1), oma = c(1, 1, 2, 1))
+
+predictor_names <- c("age", "bmi", "bp", "s1", "s2", "s3", "s4", "s5", "s6")
+
+for (pred in predictor_names) {
+  # Plot original scatter points
+  plot(gam_data[[pred]], gam_data$y, 
+       pch = 16, cex = 0.5, col = "blue4",
+       main = pred,
+       xlab = pred, 
+       ylab = "y")
+  
+  # Generate sequence for prediction
+  x_seq <- seq(min(gam_data[[pred]]), max(gam_data[[pred]]), length.out = 100)
+  
+  # Create newdata for prediction
+  newdata <- data.frame(matrix(rep(colMeans(gam_data[, -1]), each = 100), nrow = 100, byrow = FALSE))
+  colnames(newdata) <- colnames(gam_data)[-1]
+  newdata[[pred]] <- x_seq
+  
+  # Predict linear trend
+  linear_trend <- predict(lm_fit, newdata = newdata)
+  
+  # Predict smooth trend (from GAM on residuals)
+  smooth_trend <- predict(gam_fit_residuals, newdata = newdata, type = "response")
+  
+  # Combine linear and smooth trends
+  full_trend <- linear_trend + smooth_trend
+  
+  # Add linear trend (dashed green line)
+  lines(x_seq, linear_trend, col = "darkgreen", lty = 2, lwd = 1.5)
+  
+  # Add full trend (solid red line)
+  lines(x_seq, full_trend, col = "red", lwd = 2)
+  
+  # Add legend to the first plot
+  if (pred == predictor_names[1]) {
+    legend("topright", 
+           legend = c("Full (Linear + Smooth)", "Linear only"),
+           col = c("red", "darkgreen"),
+           lty = c(1, 2),
+           lwd = c(2, 1.5),
+           cex = 0.7)
+  }
+}
+
+# Add overall title and reset plot layout
+mtext("Two-Step Model: Linear + Smooth Effects", outer = TRUE, cex = 1.2)
+par(mfrow = c(1, 1))
+
+# Summary of the linear model
+summary(lm_fit)
+
+# Summary of the GAM on residuals
+summary(gam_fit_residuals)

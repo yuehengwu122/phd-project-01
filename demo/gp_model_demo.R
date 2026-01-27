@@ -164,10 +164,10 @@ compute_savage_dickey_ratios(fit_hsgp_multi)
 cat("\n=== CREATING PLOTS ===\n")
 
 cat("Plotting posterior distributions...\n")
-plot_posterior(fit_exactgp_indep, model_name = "Exact GP / Independent")
-plot_posterior(fit_exactgp_multi, model_name = "Exact GP / Multivariate") 
-plot_posterior(fit_hsgp_indep, model_name = "HSGP / Independent")
-plot_posterior(fit_hsgp_multi, model_name = "HSGP / Multivariate")
+plot_posterior_delta(fit_exactgp_indep, model_name = "Exact GP / Independent")
+plot_posterior_delta(fit_exactgp_multi, model_name = "Exact GP / Multivariate") 
+plot_posterior_delta(fit_hsgp_indep, model_name = "HSGP / Independent")
+plot_posterior_delta(fit_hsgp_multi, model_name = "HSGP / Multivariate")
 
 cat("Plotting GP trends...\n")
 # GP trends (exact GP models)
@@ -179,17 +179,3 @@ plot_hsgp_trends(fit_hsgp_indep, model_name = "HSGP / Independent")
 plot_hsgp_trends(fit_hsgp_multi, model_name = "HSGP / Multivariate")
 
 cat("Demo completed! Check the plots to compare model performance.\n")
-
-# =============================================================================
-# NEXT STEPS FOR EXPLORATION
-# =============================================================================
-cat("\n=== SUGGESTIONS FOR FURTHER EXPLORATION ===\n")
-cat("1. Try switching between simulated and real data by changing USE_SIMULATED_DATA\n")
-cat("2. Experiment with different numbers of basis functions (M) for HSGP models\n")
-cat("3. Compare model fitting times and approximation quality\n")
-cat("4. Look at individual parameter estimates using plot_posterior() with different params\n")
-cat("5. Examine residuals and model diagnostics\n")
-cat("\nExample commands to try:\n")
-cat("plot_posterior(fit_exactgp_indep, param = 'lambda')\n")
-cat("plot_gp_trends(fit_exactgp_indep, ylim = c(-2, 2))\n")
-cat("plot_hsgp_trends(fit_hsgp_indep, p = 1:3)  # Plot only first 3 predictors\n")

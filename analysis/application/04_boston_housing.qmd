@@ -19,6 +19,15 @@ library(MASS)
 data("Boston")
 X <- as.matrix(Boston[,-c(4,9,14)]) 
 y = Boston$medv
+
+# Combine into one data frame
+df <- data.frame(X)
+df$y <- y
+
+# Export
+write.csv(df, "boston_gp_input.csv", row.names = FALSE)
+
+
 fit_data <- list(
   N = nrow(X),
   y = y,
@@ -158,4 +167,9 @@ plot_gp_trends(fit_a4_dep, model_name="exact-GP / multivariate-θ",ylim=c(0,50))
 
 ```{r}
 compute_savage_dickey_ratios(fit_a4_dep)
+```
+
+```{r}
+plot_posterior_delta(fit_a4_dep, plot_prior=TRUE, bins=50, ylim=c(0,0.8))
+plot_posterior_theta(fit_a4_dep, plot_prior=TRUE, bins=50, ylim=c(0,1.5))
 ```
