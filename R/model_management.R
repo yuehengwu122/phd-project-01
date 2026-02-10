@@ -13,6 +13,7 @@ gp_add_p1_13 <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p1_13.stan")
 gp_add_p1_14 <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p1_14.stan")
 
 gp_add_p1_15 <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p1_15.stan")
+gp_add_p2_15 <- rstan::stan_model(file = "stan/multiple_gp/fit_add_p2_15.stan")
 
 
 # Null model for Bayes Factor

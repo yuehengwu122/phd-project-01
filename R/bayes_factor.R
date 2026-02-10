@@ -130,17 +130,22 @@ compute_prior_density_theta <- function(X) {
 #' Compute Savage-Dickey Ratios for All Parameters
 #'
 #' Computes the Savage-Dickey Bayes Factors for linear (theta) and 
-#' nonlinear (delta) effects. Prior density for delta is fixed at
-#' (1/2.7) * dt(0/2.7, df = 4) * 2 based on half-t(df=4, s=2.7) prior.
+#' nonlinear (delta) effects. Prior density for delta depends on the specified prior.
 #'
 #' @param result Result object from run_analysis()
+#' @param delta_prior Prior specification for delta ("p1" or "p2"). Default is "p1".
+#'   - "p1": half-t(df=4, s=2.7) prior, uses "delta" parameter
+#'   - "p2": half-t(df=1.5, s=6) prior, uses "delta2" parameter
 #' @return Data frame with SDR for linear (theta) and nonlinear (delta) effects
 #'
 #' @details
 #' The function extracts X from result$data and computes:
 #' - SDR_linear: Savage-Dickey ratio for theta (linear coefficients)
 #' - SDR_nonlinear: Savage-Dickey ratio for delta (nonlinear effects)
-compute_savage_dickey_ratios <- function(result) {
+#' 
+#' For p1: Prior density = (1/2.7) * dt(0/2.7, df = 4) * 2
+#' For p2: Prior density = (1/6) * dt(0/6, df = 1.5) * 2
+compute_savage_dickey_ratios <- function(result, delta_prior = "p1") {
   
   fit <- result$fit
   post <- rstan::extract(fit)
@@ -171,10 +176,18 @@ compute_savage_dickey_ratios <- function(result) {
   sdr_linear <- prior_d0_theta / post_d0_theta
   
   # --- Nonlinear effect (delta) ---
-  # Prior: half-t(df=4, s=2.7)
-  prior_d0_delta <- (1/2.7) * dt(0/2.7, df = 4) * 2
-  
-  delta_draws <- post$delta
+  # Set prior and parameter based on delta_prior argument
+  if (delta_prior == "p1") {
+    # Prior: half-t(df=4, s=2.7)
+    prior_d0_delta <- (1/2.7) * dt(0/2.7, df = 4) * 2
+    delta_draws <- post$delta
+  } else if (delta_prior == "p2") {
+    # Prior: half-t(df=1.5, s=6)
+    prior_d0_delta <- (1/6) * dt(0/6, df = 1.5) * 2
+    delta_draws <- post$delta2
+  } else {
+    stop("delta_prior must be either 'p1' or 'p2'")
+  }
   if (is.matrix(delta_draws)) {
     post_d0_delta <- sapply(1:P, function(j) {
       estimate_post_density_at_zero(

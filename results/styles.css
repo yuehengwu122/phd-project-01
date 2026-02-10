@@ -1,0 +1,39 @@
+.reveal p {
+  font-size: 0.5em; /* Adjust the font size for slide text */
+}
+
+.reveal h1 {
+  font-size: 1.5em; /* Adjust the font size for headings */
+}
+
+.reveal h2 {
+  font-size: 1.2em; /* Adjust the font size for headings */
+}
+
+.reveal h3 {
+  font-size: 0.8em; /* Adjust the font size for headings */
+}
+
+/* Customize font size for unordered lists (ul) */
+.reveal ul {
+  font-size: 0.7em; /* Adjust the font size for unordered lists */
+}
+
+/* Customize font size for ordered lists (ol) */
+.reveal ol {
+  font-size: 0.7em; /* Adjust the font size for ordered lists */
+}
+
+/* Customize font size for list items (li) */
+.reveal li {
+  font-size: 0.7em; /* Adjust the font size for list items */
+}
+
+/* Customize font color for code blocks */
+.reveal pre code {
+  color: #627080ff; /* Set the color for code blocks */
+  background-color: #f8f9fa; /* Optional: Set a background color */
+  padding: 10px; /* Optional: Add padding around the code block */
+  border-radius: 4px; /* Optional: Add rounded corners */
+  font-size: 0.8em; /* Optional: Adjust font size */
+}

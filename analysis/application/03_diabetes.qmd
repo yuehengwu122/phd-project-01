@@ -78,10 +78,25 @@ fit_a3_dep <- fit_model(
 # fit_a3_dep <- readRDS("analysis/application/fits/fit_a3_dep.rds")
 ```
 
+### non-local priors on delta
+
+```{r}
+fit_a3_dep_p2 <- fit_model(
+        gp_add_p2_15,
+        data = fit_data,
+        chains = 2,
+        iter = 5500,
+        warmup = 500
+)
+# saveRDS(fit_a3_dep_p2, file = "analysis/application/fits/fit_a3_dep_p2.rds")
+# fit_a3_dep_p2 <- readRDS("analysis/application/fits/fit_a3_dep_p2.rds")
+```
+
 ## Results & Diagnostics
 ```{r}
 print_quick_summary(fit_a3_indep)
 print_quick_summary(fit_a3_dep, key_params = c("delta", "lambda", "sigma", "mu", "beta"))
+print_quick_summary(fit_a3_dep_p2, key_params = c("delta2", "lambda", "sigma"))
 ```
 
 
@@ -93,12 +108,15 @@ plot_posterior_theta(fit_a3_dep, plot_prior=TRUE, bins=50, ylim=c(0,1.6))
 plot_gp_trends(fit_a3_indep, model_name="exact-GP / marginal-θ")
 plot_gp_trends(fit_a3_dep, X_orig=X, ylim=c(-2,3), 
                 model_name="exact-GP / multivariate-θ",)
+plot_gp_trends(fit_a3_dep_p2, X_orig=X, ylim=c(-2,3), delta_prior = "p2",
+                model_name="multivariate-θ / 2nd-order non-local prior")
 ```  
 
 ## BF: Savage-Dickey density ratios
 ```{r}
 compute_savage_dickey_ratios(fit_a3_indep)
 compute_savage_dickey_ratios(fit_a3_dep)
+compute_savage_dickey_ratios(fit_a3_dep_p2, delta_prior = "p2")
 ```
 
 
@@ -179,4 +197,38 @@ gam_fit_time
 ```{r}
 bridgesampling::bridge_sampler(try_fit)
 bridgesampling::bridge_sampler(fit_a3_indep_hsgp$fit)
+```
+
+
+
+
+
+```{r}
+prior_d0_delta <- (1/6) * dt(0/6, df = 1.5) * 2
+post_delta2 <- rstan::extract(fit_a3_dep_p2$fit)$delta2[,8]
+post_d0_delta2 <- density(post_delta2, from = 0, to = max(post_delta2))$y[1]
+post_d0_delta2_logspline <- dlogspline(0, logspline(post_delta2, lbound = 0, ubound = max(post_delta2)))
+```
+
+
+
+```{r}
+
+
+f0_from_cdf_slope <- function(x, hs = seq(0.002, 0.02, by = 0.002)) {
+  Fh <- sapply(hs, function(h) mean(x <= h))
+  # 过原点最小二乘斜率：sum(h*Fh)/sum(h^2)
+  slope <- sum(hs * Fh) / sum(hs^2)
+  list(f0 = slope, hs = hs, Fh = Fh)
+}
+
+SDR_from_cdf_slope <- function(post, prior0, hs = seq(0.002, 0.02, by = 0.002)) {
+  a <- f0_from_cdf_slope(post, hs)
+  SDR <- prior0 /a$f0
+  list(SDR = SDR, f0_post = a$f0, hs = hs, F_post = a$Fh)
+}
+
+prior_d0_delta <- (1/6) * dt(0/6, df = 1.5) * 2
+post_delta2 <- rstan::extract(fit_a3_dep_p2$fit)$delta2[,8]
+SDR_from_cdf_slope(post_delta2, prior_d0_delta)
 ```

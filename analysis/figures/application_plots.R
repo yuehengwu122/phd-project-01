@@ -173,3 +173,14 @@ plot_effect_posterior(
   ylim = c(-10, 10)
 )
 dev.off()
+
+
+sdr_nonlinear_a3 <- compute_savage_dickey_ratios(fit_a3_dep_p2, delta_prior = "p2")$SDR_nonlinear
+plot_effect_posterior(
+  fit_a3_dep_p2, 
+  effect_type = "nonlinear", 
+  sdr_values = sdr_nonlinear_a3, 
+  title = expression("SDR"["10"]*"-Based Ranking of Nonlinear Effects"),
+  ylab = expression("posterior of " * delta[j]),
+  ylim = c(0, 10)
+)

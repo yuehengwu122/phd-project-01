@@ -1,0 +1,115 @@
+---
+title: " "
+author: " "
+date: "2026-02-03"
+format: 
+  revealjs:
+    css: styles.css
+---
+
+## Progress This Week
+<br>
+
+### Method Comparison
+- Ran GAM models on both the diabetes and Boston housing datasets.
+
+## GAM fit
+
+### `mgcv` package
+```
+mgcv::gam(y ~ age + bmi + bp + s1 + s2 + s3 + s4 + s5 + s6 + 
+            s(age, bs = "tp", m = 1, k = 10) + 
+            s(bmi, bs = "tp", m = 1, k = 10) + 
+            ... + 
+            s(s6, bs = "tp", m = 1, k = 10), 
+            data = gam_data, method = "REML")
+```
+- Setting `m = 1` applies a **first-derivative penalty**
+<br>
+
+### `gam` package
+```
+gam::gam(y ~ age + bmi + bp + s1 + s2 + s3 + s4 + s5 + s6 +
+            s(age) + s(bmi) + s(bp) + s(s1) + s(s2) + 
+            s(s3) + s(s4) + s(s5) + s(s6),
+            data = gam_data)
+```
+- Explicitly decomposes each predictor into a **parametric (linear)** part and a **nonparametric (smooth)** part.
+- Linear effects are fitted via weighted least squares inside the backfitting algorithm.
+- Provides separate ANOVA tables for **linear effects** and **departures from linearity**.
+
+
+
+
+## Diabetes (Linear vs Nonlinear)
+```{=html}
+<style>
+table {
+  font-size: 0.5em;
+}
+</style>
+```
+<table style="border-collapse: collapse; width: 100%; border-bottom:1px solid black;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="border:1px solid black; padding:6px;">Variable</th>
+      <th colspan="3" style="border:1px solid black; padding:6px;">Linear effect</th>
+      <th colspan="3" style="border:1px solid black; padding:6px; border-left:1px solid black;">Nonlinear effect</th>
+    </tr>
+    <tr>
+      <th style="border:1px solid black; padding:6px;">SDR<br>logBF10</th>
+      <th style="border:1px solid black; padding:6px;">mgcv<br>Pr(>|t|)</th>
+      <th style="border:1px solid black; padding:6px;">gam<br>Pr(>|t|)</th>
+      <th style="border:1px solid black; padding:6px; border-left:1px solid black;">SDR<br>logBF10</th>
+      <th style="border:1px solid black; padding:6px;">mgcv<br>Pr(>|t|)</th>
+      <th style="border:1px solid black; padding:6px;">gam<br>Pr(>|t|)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="border:1px solid black;">age</td><td>-3.08</td><td>0.639</td><td>8.21e-11 (***)</td><td style="border-left:1px solid black;">0.11</td><td>0.0449 (*)</td><td style="border-right:1px solid black;">0.0222 (*)</td></tr>
+    <tr><td style="border:1px solid black;">bmi</td><td><b>6.32</b></td><td>0.0166 (*)</td><td>&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;">-0.32</td><td>0.00531 (**)</td><td style="border-right:1px solid black;">0.0494 (*)</td></tr>
+    <tr><td style="border:1px solid black;">bp</td><td><b>2.11</b></td><td>0.000111 (***)</td><td>2.27e-10 (***)</td><td style="border-left:1px solid black;">-0.58</td><td>0.342</td><td style="border-right:1px solid black;">0.296</td></tr>
+    <tr><td style="border:1px solid black;">s1</td><td>0.08</td><td>0.0833</td><td>0.160</td><td style="border-left:1px solid black;">-0.70</td><td>0.901</td><td style="border-right:1px solid black;">0.406</td></tr>
+    <tr><td style="border:1px solid black;">s2</td><td>-0.06</td><td>0.165</td><td>0.131</td><td style="border-left:1px solid black;">-0.57</td><td>0.597</td><td style="border-right:1px solid black;">0.110</td></tr>
+    <tr><td style="border:1px solid black;">s3</td><td>-0.43</td><td>0.439</td><td>7.68e-15 (***)</td><td style="border-left:1px solid black;">-0.70</td><td>0.926</td><td style="border-right:1px solid black;">0.786</td></tr>
+    <tr><td style="border:1px solid black;">s4</td><td>-0.80</td><td>0.535</td><td>0.603</td><td style="border-left:1px solid black;">-0.72</td><td>0.827</td><td style="border-right:1px solid black;">0.585</td></tr>
+    <tr><td style="border:1px solid black;">s5</td><td>0.26</td><td>0.000291 (***)</td><td>1.10e-07 (***)</td><td style="border-left:1px solid black;">-0.01</td><td>0.228</td><td style="border-right:1px solid black;">0.216</td></tr>
+    <tr><td style="border:1px solid black; border-bottom:1px solid black;">s6</td><td style="border-bottom:1px solid black;">-1.18</td><td style="border-bottom:1px solid black;">0.741</td><td style="border-bottom:1px solid black;">0.327</td><td style="border-left:1px solid black; border-bottom:1px solid black;">0.34</td><td style="border-bottom:1px solid black;">0.000794 (***)</td><td style="border-right:1px solid black; border-bottom:1px solid black;">0.00985 (**)</td></tr>
+  </tbody>
+</table>
+*Stars for p-values: ($*$) p < 0.05, ($**$) p < 0.01, ($***$) p < 0.001.
+
+
+## Boston Housing 
+
+<table style="border-collapse: collapse; width: 100%; border-bottom:1px solid black;">
+  <thead>
+    <tr>
+      <th rowspan="2" style="border:1px solid black; padding:6px;">Variable</th>
+      <th colspan="3" style="border:1px solid black; padding:6px;">Linear effect</th>
+      <th colspan="3" style="border:1px solid black; padding:6px; border-left:1px solid black;">Nonlinear effect</th>
+    </tr>
+    <tr>
+      <th style="border:1px solid black; padding:6px;">SDR<br>logBF10</th>
+      <th style="border:1px solid black; padding:6px;">mgcv<br>Pr(>|t|)</th>
+      <th style="border:1px solid black; padding:6px;">gam<br>Pr(>|t|)</th>
+      <th style="border:1px solid black; padding:6px; border-left:1px solid black;">SDR<br>logBF10</th>
+      <th style="border:1px solid black; padding:6px;">mgcv<br>Pr(>|t|)</th>
+      <th style="border:1px solid black; padding:6px;">gam<br>Pr(>|t|)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td style="border:1px solid black;">crim</td><td><b>2.24</b></td><td>0.0940</td><td>&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;"><b>1.50</b></td><td>0.00124 (**)</td><td style="border-right: 1px solid black;">0.00219 (**)</td></tr>
+    <tr><td style="border:1px solid black;">zn</td><td>-0.71</td><td>0.0848</td><td>&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;">-0.56</td><td>0.327</td><td style="border-right: 1px solid black;">0.118</td></tr>
+    <tr><td style="border:1px solid black;">indus</td><td>-0.47</td><td>0.144</td><td>&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;"><b>1.93</b></td><td>4.59e-07 (***)</td><td style="border-right: 1px solid black;">5.88e-05 (***)</td></tr>
+    <tr><td style="border:1px solid black;">nox</td><td>-0.16</td><td>0.533</td><td>4.86e-06 (***)</td><td style="border-left:1px solid black;"><b>5.06</b></td><td>&lt;2e-16 (***)</td><td style="border-right: 1px solid black;">0.00117 (**)</td></tr>
+    <tr><td style="border:1px solid black;">rm</td><td><b>10.40</b></td><td>0.150</td><td>&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;"><b>4.55</b></td><td>&lt;2e-16 (***)</td><td style="border-right: 1px solid black;">&lt;2.2e-16 (***)</td></tr>
+    <tr><td style="border:1px solid black;">age</td><td>-0.95</td><td>0.338</td><td>0.000210 (***)</td><td style="border-left:1px solid black;">-0.82</td><td>0.631</td><td style="border-right: 1px solid black;">0.375</td></tr>
+    <tr><td style="border:1px solid black;">dis</td><td><b>2.03</b></td><td>0.0135 (*)</td><td>&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;"><b>3.97</b></td><td>7.77e-07 (***)</td><td style="border-right: 1px solid black;">8.52e-05 (***)</td></tr>
+    <tr><td style="border:1px solid black;">tax</td><td>-0.13</td><td>0.313</td><td>0.152</td><td style="border-left:1px solid black;"><b>4.07</b></td><td>&lt;2e-16 (***)</td><td style="border-right: 1px solid black;">4.22e-11 (***)</td></tr>
+    <tr><td style="border:1px solid black;">ptratio</td><td><b>5.70</b></td><td>1.65e-08 (***)</td><td>3.23e-15 (***)</td><td style="border-left:1px solid black;">-0.64</td><td>0.391</td><td style="border-right: 1px solid black;">0.314</td></tr>
+    <tr><td style="border:1px solid black;">black</td><td>-0.89</td><td>0.700</td><td>1.58e-07 (***)</td><td style="border-left:1px solid black;">-0.30</td><td>0.00447 (**)</td><td style="border-right: 1px solid black;">0.00561 (**)</td></tr>
+    <tr><td style="border:1px solid black;">lstat</td><td><b>12.26</b></td><td>0.0569</td><td style="border-right: 1px solid black;">&lt;2.2e-16 (***)</td><td style="border-left:1px solid black;"><b>3.45</b></td><td>&lt;2e-16 (***)</td><td style="border-right: 1px solid black;">1.44e-14 (***)</td></tr>
+  </tbody>
+</table>
+*Stars for p-values: ($*$) p < 0.05, ($**$) p < 0.01, ($***$) p < 0.001.
