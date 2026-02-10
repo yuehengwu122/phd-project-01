@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="260209_files/libs/clipboard/clipboard.min.js"></script>
+<script src="260209_files/libs/quarto-html/tabby.min.js"></script>
+<script src="260209_files/libs/quarto-html/popper.min.js"></script>
+<script src="260209_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="260209_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="260209_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="260209_files/libs/quarto-html/quarto-syntax-highlighting-a37c72dd2dbac68997fcdc15a3622e78.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.7.24">
+
+  <meta name="author" content="">
+  <meta name="dcterms.date" content="2026-02-09">
+  <title>quarto-input31dbb0dc406f5494</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="260209_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="260209_files/libs/revealjs/dist/reveal.css">
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+  </style>
+  <link rel="stylesheet" href="260209_files/libs/revealjs/dist/theme/quarto-f563837468303362081e247dddd440d0.css">
+  <link rel="stylesheet" href="styles.css">
+  <link href="260209_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="260209_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="260209_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="260209_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+
+<section id="progress-this-week" class="slide level2">
+<h2>Progress This Week</h2>
+<ul>
+<li>Higher order non-local priors for <span class="math inline">\(\delta\)</span>.</li>
+<li>Empirical p2 application</li>
+<li>GAM diagnostics</li>
+</ul>
+</section>
+<section>
+<section id="non-local-priors" class="title-slide slide level1 center">
+<h1>1. Non-local Priors</h1>
+
+</section>
+<section id="candidate-priors-p1p4" class="slide level2">
+<h2>Candidate priors p1–p4</h2>
+<style>
+table {
+  font-size: 0.5em;
+}
+</style>
+<table class="caption-top">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><span class="math inline">\(\delta \sim t^+(df=4,s=2.7)\)</span></th>
+<th><span class="math inline">\(\delta^2 \sim t^+(df=1.5,s=6)\)</span></th>
+<th><span class="math inline">\(\delta^3 \sim t^+(df=1,s=12)\)</span></th>
+<th><span class="math inline">\(\delta^4 \sim t^+(df=0.7,s=25)\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Q50</td>
+<td>1.9999</td>
+<td>2.2881 (14.41%)</td>
+<td>2.2894 (14.48%)</td>
+<td>2.3405 (17.03%)</td>
+</tr>
+<tr class="even">
+<td>Q90</td>
+<td>5.7560</td>
+<td>4.7150 (18.09%)</td>
+<td>4.2315 (26.49%)</td>
+<td>4.2931 (25.42%)</td>
+</tr>
+<tr class="odd">
+<td>Q99</td>
+<td>12.4311</td>
+<td>10.3403 (16.82%)</td>
+<td>9.1413 (26.46%)</td>
+<td>9.7732 (21.38%)</td>
+</tr>
+<tr class="even">
+<td>Tail</td>
+<td>-5.000</td>
+<td>-4.000</td>
+<td>-4.000</td>
+<td>-3.800</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><em>Tail</em>: how slowly the prior probability decays as <span class="math inline">\(\delta \to \infty\)</span></li>
+</ul>
+
+<img data-src="images/image.png" class="quarto-figure quarto-figure-center r-stretch"></section>
+<section id="simulation-dataset-1-small-nonlinear-effect" class="slide level2">
+<h2>Simulation: Dataset 1 (small nonlinear effect)</h2>
+<pre><code>N = 50, range(x) = 1, delta=0.5, lambda=0.3, sigma=0.1, 10th</code></pre>
+<div class="cell">
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+<col style="width: 16%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Prior</strong></th>
+<th><strong>prior at 0</strong></th>
+<th><strong>post at 0</strong></th>
+<th><strong>SDR</strong></th>
+<th><strong>Median delta</strong></th>
+<th><strong>Median lambda</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>p1</td>
+<td>0.2777778</td>
+<td>0.347</td>
+<td>0.8</td>
+<td>1.003251</td>
+<td>0.353345</td>
+</tr>
+<tr class="even">
+<td>p2</td>
+<td>0.1135783</td>
+<td>0.194</td>
+<td>0.58</td>
+<td>1.619352</td>
+<td>0.3992331</td>
+</tr>
+<tr class="odd">
+<td>p3</td>
+<td>0.05305165</td>
+<td>0.148</td>
+<td>0.36</td>
+<td>1.863093</td>
+<td>0.4230877</td>
+</tr>
+<tr class="even">
+<td>p4</td>
+<td>0.0235709</td>
+<td>0.070</td>
+<td>0.33</td>
+<td>2.014852</td>
+<td>0.4348687</td>
+</tr>
+</tbody>
+</table>
+</div>
+<ul>
+<li>When effect is weak, SDR behaves as expected.</li>
+</ul>
+</section>
+<section id="simulation-dataset-2-large-nonlinear-effect" class="slide level2">
+<h2>Simulation: Dataset 2 (large nonlinear effect)</h2>
+<pre><code>N = 50, range(x) = 1, delta=3, lambda=0.3, sigma=0.1, 1st</code></pre>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th>Prior</th>
+<th>SDR</th>
+<th>Median delta</th>
+<th>Median lambda</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>p1</td>
+<td>7.56e+02</td>
+<td>2.31</td>
+<td>0.41</td>
+</tr>
+<tr class="even">
+<td>p2</td>
+<td>60.81</td>
+<td>2.28</td>
+<td>0.40</td>
+</tr>
+<tr class="odd">
+<td>p3</td>
+<td>4.19566</td>
+<td>2.250076</td>
+<td>0.40</td>
+</tr>
+<tr class="even">
+<td>p4</td>
+<td>0</td>
+<td>2.28</td>
+<td>0.41</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Strong nonlinearity makes SDR highly sensitive to estimating posterior density at 0.</li>
+</ul>
+</section>
+<section id="simulation-dataset-2-large-nonlinear-effect-1" class="slide level2">
+<h2>Simulation: Dataset 2 (large nonlinear effect)</h2>
+<h3 id="trim-posterior-to-use-the-first-90-80-70-or-60-of-samples">Trim posterior to use the first 90%, 80%, 70%, or 60% of samples</h3>
+<table class="caption-top" style="width:100%;">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>prior at 0</strong></th>
+<th><strong>post at 0 (SDR10)</strong></th>
+<th><strong>0.9</strong></th>
+<th><strong>0.8</strong></th>
+<th><strong>0.7</strong></th>
+<th><strong>0.6</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>p1</td>
+<td>0.2777778</td>
+<td>0.000367 (756.3239)</td>
+<td>0.000389 (714.6245)</td>
+<td>0.000793 (350.2573)</td>
+<td>0.001092 (254.2482)</td>
+<td>0.000638 (435.6454)</td>
+</tr>
+<tr class="even">
+<td>p2</td>
+<td>0.1135783</td>
+<td>0.0019 (60.81384)</td>
+<td>0.0031 (37.0008)</td>
+<td>0.0049 (23.01086)</td>
+<td>0.0037 (30.41612)</td>
+<td>0.0085 (13.37891)</td>
+</tr>
+<tr class="odd">
+<td>p3</td>
+<td>0.05305165</td>
+<td>0.01264 (4.19566)</td>
+<td>0.0027 (19.80992)</td>
+<td>0.0029 (18.40702)</td>
+<td>0.0050 (10.55508)</td>
+<td>0.0039 (13.70944)</td>
+</tr>
+<tr class="even">
+<td>p4</td>
+<td>0.0235709</td>
+<td>Inf (0)</td>
+<td>0.0027 (8.628321)</td>
+<td>0.0032 (7.405106)</td>
+<td>0.0141 (1.673175)</td>
+<td>0.0163 (1.445878)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Trimming reduces tail influence and stabilizes post-at-0, but doesn’t fully offset changes in prior-at-0.</li>
+</ul>
+</section></section>
+<section>
+<section id="empirical-p2-application" class="title-slide slide level1 center">
+<h1>2. Empirical p2 application</h1>
+
+</section>
+<section id="empirical-diabetes-sdr-results" class="slide level2">
+<h2>Empirical: Diabetes — SDR results</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Nonlinear SDR (p1 vs p2)</strong></p>
+<pre><code>         p1      p2
+age      1.30    0.445
+bmi      0.48    0.225
+bp       0.26    0.159
+s1       0.20    0.184
+s2       0.27    0.277
+s3       0.20    0.142
+s4       0.19    0.165
+s5       0.98    0.567
+s6       2.20    0.538</code></pre>
+</div><div class="column" style="width:50%;">
+<p><strong>Linear SDR (p1 vs p2)</strong></p>
+<pre><code>         p1        p2
+age      4.6e-02   4.25e-02
+bmi      2.1e+06   9.0e+06
+bp       1.3e+02   1.48e+02
+s1       1.2e+00   1.34e+00
+s2       8.7e-01   1.01e+00
+s3       3.7e-01   4.04e-01
+s4       1.6e-01   1.67e-01
+s5       1.8e+00   1.51e+00
+s6       6.6e-02   6.58e-02</code></pre>
+</div></div>
+<ul>
+<li>p2 nonlinear SDRs are smaller than p1 for most predictors.</li>
+<li>Several predictors show a different direction of evidence.</li>
+<li>the p1–p2 discrepancy is not from MCMC mixing (posteriors look stable), but from SDR density-at-zero estimation being harder for <span class="math inline">\(\delta^2\)</span> (heavier tail / fewer samples near 0).</li>
+</ul>
+</section>
+<section id="empirical-diabetes-check-posterior" class="slide level2">
+<h2>Empirical: Diabetes — Check Posterior</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Posterior: p1 — delta</strong> <img data-src="images/diabetes_p1_delta.png" class="quarto-figure quarto-figure-center" style="width:90.0%"></p>
+</div><div class="column" style="width:50%;">
+<p><strong>Posterior: p2 — delta^2</strong> <img data-src="images/diabetes_p2_delta2.png" class="quarto-figure quarto-figure-center" style="width:90.0%"></p>
+</div></div>
+</section>
+<section id="empirical-boston-sdr-results" class="slide level2">
+<h2>Empirical: Boston — SDR results</h2>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Nonlinear SDR (p1 vs p2)</strong></p>
+<pre><code>         p1         p2
+crim     3.15e+01   1.56e+01
+zn       2.75e-01   4.93e-01
+indus    8.58e+01   7.59e+00
+nox      1.14e+05   8.63e+02
+rm       3.54e+04   2.74e+02
+age      1.51e-01   2.62e-01
+dis      9.24e+03   1.15e+03
+tax      1.17e+04   6.45e+02
+ptratio  2.31e-01   3.85e-01
+black    5.05e-01   7.15e-01
+lstat    2.85e+03   1.24e+03</code></pre>
+</div><div class="column" style="width:50%;">
+<p><strong>Linear SDR (p1 vs p2)</strong></p>
+<pre><code>         p1          p2
+crim     1.73e+02    1.11e+02
+zn       1.93e-01    2.02e-01
+indus    3.36e-01    3.29e-01
+nox      6.85e-01    7.70e-01
+rm       2.52e+10    1.61e+10
+age      1.11e-01    1.14e-01
+dis      1.07e+02    8.09e+01
+tax      7.44e-01    7.82e-01
+ptratio  5.02e+05    1.74e+04
+black    1.30e-01    1.30e-01
+lstat    1.80e+12    3.97e+11</code></pre>
+</div></div>
+</section></section>
+<section>
+<section id="gam" class="title-slide slide level1 center">
+<h1>3. GAM</h1>
+
+</section>
+<section id="gam-fits" class="slide level2">
+<h2>GAM Fits</h2>
+<h3 id="linear-only-dgp-type-i-error-on-smooth-term">Linear-only DGP: Type I Error on Smooth Term</h3>
+<p><strong>Design</strong>: <span class="math inline">\(y = \beta x + \epsilon\)</span>, <span class="math inline">\(n=50\)</span>, 1000 replicates, <span class="math inline">\(\beta=0.5\)</span></p>
+<table class="caption-top">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Method</strong></th>
+<th><strong>Type I Error (p &lt; 0.05)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mgcv::gam(y ~ x + s(x))</code></td>
+<td><strong><span style="color:red;">0.620</span></strong></td>
+</tr>
+<tr class="even">
+<td><code>gam::gam(y ~ x + s(x))</code></td>
+<td><strong>0.064</strong></td>
+</tr>
+<tr class="odd">
+<td><code>mgcv::gam(y ~ x + s(x, bs="tp", m=1, k=10))</code></td>
+<td><strong>0.080</strong></td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<ul>
+<li>Unconstrained smooth in mgcv severely inflates false positives (62%)</li>
+<li>First-derivative penalty (<code>m=1</code>) reduces inflation to near-nominal (8%)</li>
+<li><code>gam::gam</code> maintains nominal rate but uses different fitting approach</li>
+</ul>
+</section>
+<section id="gam-fits-1" class="slide level2">
+<h2>GAM Fits</h2>
+<h3 id="nonlinear-only-dgp">Nonlinear-only DGP</h3>
+<p><strong>Design</strong>: <span class="math inline">\(y = \sin(2x) + \epsilon\)</span>, <span class="math inline">\(n=50\)</span>, many replicates</p>
+<table class="caption-top">
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Type I Error (Linear)</strong></th>
+<th><strong>Power (Nonlinear)</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>mgcv</code> with <code>m=1</code></td>
+<td>0.003</td>
+<td>0.947</td>
+</tr>
+<tr class="even">
+<td><code>gam::gam</code></td>
+<td><span style="color:red;">0.202</span></td>
+<td>0.976</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<ul>
+<li><code>mgcv</code> with <code>m=1</code>: conservative on linear effects, high power for nonlinearity</li>
+<li><code>gam::gam</code>: tends to over-call linear effects</li>
+</ul>
+</section>
+<section id="gam-fits-real-data-analysis" class="slide level2">
+<h2>GAM Fits: Real Data Analysis</h2>
+<h3 id="bootstrap-p-value-rates-diabetes-dataset">Bootstrap p-value rates (Diabetes dataset)</h3>
+<p>Bootstrap procedure: 100 resamples, proportion of significant tests (p &lt; 0.05) reported for each predictor.</p>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>mgcv::gam</strong> (<code>m=1</code>)</p>
+<pre><code>         linear  nonlinear
+age       0.03      0.82
+bmi       0.43      0.83
+bp        0.51      0.48
+s1        0.17      0.29
+s2        0.06      0.69
+s3        0.02      0.23
+s4        0.05      0.84
+s5        0.68      0.33
+s6        0.00      0.80</code></pre>
+</div><div class="column" style="width:50%;">
+<p><strong>gam::gam</strong></p>
+<pre><code>         linear  nonlinear
+age       1.00      0.85
+bmi       1.00      0.79
+bp        1.00      0.35
+s1        0.39      0.37
+s2        0.45      0.65
+s3        1.00      0.14
+s4        0.33      0.23
+s5        1.00      0.32
+s6        0.19      0.93</code></pre>
+</div></div>
+</section>
+<section id="gam-fits-real-data-analysis-cont." class="slide level2">
+<h2>GAM Fits: Real Data Analysis (cont.)</h2>
+<h3 id="bootstrap-p-value-rates-boston-housing-dataset">Bootstrap p-value rates (Boston Housing dataset)</h3>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>mgcv::gam</strong> (<code>m=1</code>)</p>
+<pre><code>          linear  nonlinear
+crim       0.41      0.62
+zn         0.23      0.52
+indus      0.08      0.51
+nox        0.14      0.00
+rm         0.71      0.00
+age        0.15      0.50
+dis        0.88      0.17
+tax        0.37      0.10
+ptratio    0.45      0.49
+black      0.02      0.75
+lstat      0.71      0.18</code></pre>
+</div><div class="column" style="width:50%;">
+<p><strong>gam::gam</strong></p>
+<pre><code>          linear  nonlinear
+crim       1.00      0.90
+zn         1.00      0.49
+indus      1.00      0.95
+nox        0.91      0.97
+rm         1.00      0.05
+age        0.90      0.30
+dis        1.00      0.88
+tax        0.44      0.85
+ptratio    1.00      0.18
+black      0.99      0.96
+lstat      1.00      0.63</code></pre>
+</div></div>
+<p><strong>Systematic pattern</strong>: <code>gam</code> produces higher linear significance rates across predictors compared to constrained <code>mgcv</code></p>
+
+</section></section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="260209_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="260209_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="260209_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="260209_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': true,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: false,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: false,
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'block',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1050,
+
+        height: 700,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0.1,
+
+        math: {
+          mathjax: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+            const codeEl = trigger.previousElementSibling.cloneNode(true);
+            for (const childEl of codeEl.children) {
+              if (isCodeAnnotation(childEl)) {
+                childEl.remove();
+              }
+            }
+            return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>
