@@ -25,19 +25,7 @@
 #' - Leveling reflects difficulty estimating pointwise posterior density
 #'   when posterior mass is far from zero
 
-# Load user-defined functions
-source("R/stan_fitting.R")
-source("R/bayes_factor.R")
-source("R/simulation_utils.R")
-
-# Load required packages
-library(rstan)
-library(bridgesampling)
-library(logspline)
-
-# Configure Stan computational options
-rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
+source("_common.R")
 
 # ============================================
 # EXPERIMENT 1: PARAMETER SPECIFICATIONS

@@ -33,6 +33,7 @@ fit_data <- list(
   X = apply(X, 2, rescale_to_range1), 
   M = 40
 )
+
 ```
 
 ## Exploratory Visualizations
@@ -68,7 +69,7 @@ fit_a3_indep <- fit_model(
 ### dependent prior on theta
 ```{r}
 fit_a3_dep <- fit_model(
-        gp_add_p1_14,
+        gp_add_p1_15,
         data = fit_data,
         chains = 2,
         iter = 5500,
@@ -95,8 +96,11 @@ fit_a3_dep_p2 <- fit_model(
 ## Results & Diagnostics
 ```{r}
 print_quick_summary(fit_a3_indep)
-print_quick_summary(fit_a3_dep, key_params = c("delta", "lambda", "sigma", "mu", "beta"))
-print_quick_summary(fit_a3_dep_p2, key_params = c("delta2", "lambda", "sigma"))
+print_quick_summary(fit_a3_dep, key_params = c("delta", "lambda", "sigma", "mu", "beta", "theta"))
+print_quick_summary(fit_a3_dep_p2, key_params = c("delta2", "lambda", "sigma", "mu", "beta1", "theta"))
+
+summary_gp_fit(fit_a3_dep)
+summary_gp_fit(fit_a3_dep_p2, X_orig = X, delta_prior = "p2")
 ```
 
 
@@ -194,41 +198,184 @@ gam_fit_time
 - plot see `/Users/ywu/Documents/phd-project-01/experiments/260107_gam_diabetes.R`
 
 
+
+
+
+
 ```{r}
-bridgesampling::bridge_sampler(try_fit)
-bridgesampling::bridge_sampler(fit_a3_indep_hsgp$fit)
+# X: N x P matrix used in Stan
+# beta1_draws: posterior draws of beta1 (S x P), e.g. from posterior::as_draws_df()
+
+library(posterior)
+
+draws <- as_draws_df(fit_a3_dep$fit)
+
+# --- 1) single-number check: posterior mean of X %*% beta1 ---
+P <- ncol(X)
+
+beta1_mat <- as.matrix(draws[, paste0("beta1[", 1:P, "]")])  # S x P
+beta1_mean <- colMeans(beta1_mat)                             # length P
+
+Xbeta1_mean <- as.vector(X %*% beta1_mean)                    # length N
+summary(Xbeta1_mean)
+
+# --- 2) pointwise posterior distribution of X %*% beta1 (at each observation) ---
+Xbeta1_draws <- beta1_mat %*% t(X)    # S x N (since (SxP)*(PxN))
+# posterior mean for each i
+Xbeta1_point_mean <- colMeans(Xbeta1_draws)                   # length N
+# posterior quantiles for each i (2.5%, 50%, 97.5%)
+Xbeta1_point_q <- apply(Xbeta1_draws, 2, quantile, probs = c(.025, .5, .975))
+
+# quick look at a few observations:
+head(Xbeta1_point_mean)
+Xbeta1_point_q[, 1:5]
+
+# --- 3) scalar summary: the dot product x_bar' beta1 (this is what drives beta0) ---
+x_bar <- colMeans(X)
+xbar_beta1_draws <- as.vector(beta1_mat %*% x_bar)            # length S
+mean(xbar_beta1_draws)
+quantile(xbar_beta1_draws, c(.025, .5, .975))
+
+# If you used centered X in Stan, and you want X_c %*% beta1 instead:
+X_c <- scale(X, center = TRUE, scale = FALSE)
+Xcbeta1_mean <- as.vector(X_c %*% beta1_mean)
+summary(Xcbeta1_mean)
+
+```
+
+
+```{r}
+# posterior mean of beta1
+beta1_mean <- colMeans(beta1_mat)
+
+x_bar <- colMeans(X)
+
+# this should be approximately -beta0_mean (since y_bar ~ 0)
+xbar_beta1 <- sum(x_bar * beta1_mean)
+xbar_beta1
+
+mean_beta0 <- mean(draws$beta0)
+mean_beta0
+
+mean_beta0 + xbar_beta1  # should be ~0 (since y_bar ~ 0)
+
+```
+
+
+
+```{r}
+library(posterior)
+
+draws <- as_draws_df(fit_a3_dep$fit)
+
+P <- ncol(X)
+
+# Extract beta1 draws: S x P
+beta1_mat <- as.matrix(draws[, paste0("beta1[", 1:P, "]")])
+
+# Recompute x_bar from the EXACT X you passed into Stan
+x_bar <- colMeans(X)
+
+# Stan's dot_product(x_bar, beta1) per draw: length S
+xbar_beta1_draw <- as.vector(beta1_mat %*% x_bar)
+
+# Now check the identity draw-by-draw.
+# y_bar in Stan is mean(y). You computed mean(y) ~ 0, use that:
+y_bar <- mean(y)
+
+beta0_draw <- draws$beta0
+
+xbar_beta1_draw2 <- rowSums(beta1_mat * rep(x_bar, each=nrow(beta1_mat)))  # S
+summary(y_bar - xbar_beta1_draw2)
+
+
+summary(beta0_draw)
+summary(-xbar_beta1_draw)          # should match beta0_draw if y_bar ~ 0
+summary(y_bar - xbar_beta1_draw)
+summary(beta0_draw - (y_bar - xbar_beta1_draw))
+
+max(abs(beta0_draw - (y_bar - xbar_beta1_draw)))
+
+```
+
+
+```{r}
+draws <- posterior::as_draws_df(fit_a3_dep$fit)
+y_bar <- mean(y)  # ~0
+xbar_beta1_implied <- y_bar - draws$beta0
+summary(xbar_beta1_implied)
+```
+
+
+```{r}
+d <- fit_a3_dep$data
+X_stan <- d$X
+y_stan <- d$y
+
+c(mean(y_stan), mean(fit_data$y))             # should match
+range(colMeans(X_stan))              # THIS determines x_bar in Stan
+range(colMeans(fit_data$X))                   # compare to your current X
 ```
 
 
 
 
 
+
 ```{r}
-prior_d0_delta <- (1/6) * dt(0/6, df = 1.5) * 2
-post_delta2 <- rstan::extract(fit_a3_dep_p2$fit)$delta2[,8]
-post_d0_delta2 <- density(post_delta2, from = 0, to = max(post_delta2))$y[1]
-post_d0_delta2_logspline <- dlogspline(0, logspline(post_delta2, lbound = 0, ubound = max(post_delta2)))
+library(posterior)
+
+fit <- fit_a3_dep$fit
+draws <- as_draws_df(fit)
+
+# Extract exactly the data used by Stan
+d <- fit_a3_dep$data
+X_used <- d$X
+y_used <- d$y
+
+P <- ncol(X_used)
+
+beta1_names <- paste0("beta1[", 1:P, "]")
+beta1_mat <- as.matrix(draws[, beta1_names])
+
+x_bar_used <- colMeans(X_used)
+y_bar_used <- mean(y_used)
+
+# dot_product(x_bar, beta1) per draw
+xbar_beta1_draw <- as.vector(beta1_mat %*% x_bar_used)
+
+# This MUST match beta0 (draw-by-draw) if beta0 was defined as y_bar - dot_product(...)
+beta0_recon <- y_bar_used - xbar_beta1_draw
+
+summary(draws$beta0)
+summary(beta0_recon)
+
+summary(draws$beta0 - beta0_recon)
+max(abs(draws$beta0 - beta0_recon))
+
 ```
 
 
 
 ```{r}
 
-
-f0_from_cdf_slope <- function(x, hs = seq(0.002, 0.02, by = 0.002)) {
-  Fh <- sapply(hs, function(h) mean(x <= h))
-  # 过原点最小二乘斜率：sum(h*Fh)/sum(h^2)
-  slope <- sum(hs * Fh) / sum(hs^2)
-  list(f0 = slope, hs = hs, Fh = Fh)
+for ( i in 1:1e3 ) {
+  beta1 <- beta1_mat[i, ]
+  xbar_beta1 <- sum(x_bar_used * beta1)
+  beta0_recon <- y_bar_used - xbar_beta1
 }
-
-SDR_from_cdf_slope <- function(post, prior0, hs = seq(0.002, 0.02, by = 0.002)) {
-  a <- f0_from_cdf_slope(post, hs)
-  SDR <- prior0 /a$f0
-  list(SDR = SDR, f0_post = a$f0, hs = hs, F_post = a$Fh)
-}
-
-prior_d0_delta <- (1/6) * dt(0/6, df = 1.5) * 2
-post_delta2 <- rstan::extract(fit_a3_dep_p2$fit)$delta2[,8]
-SDR_from_cdf_slope(post_delta2, prior_d0_delta)
 ```
+
+
+
+```{r}
+X_data <- fit_data$X - colMeans(fit_data$X)
+coef_lm <- as.vector(lm(y~X_data)$coef)
+beta1 <- coef_lm[2:10]
+mean(y) - sum(beta1 * mean(X_data))
+```
+
+original X: -1.175096e-16
+centered original X: -1.651289e-16
+rescaled X: 0.4482359
+centered rescaled X: 4.531069e-17

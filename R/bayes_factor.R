@@ -26,7 +26,9 @@
 #' bf_gp_vs_null <- compute_bayes_factor(fit_gp, fit_null)
 #' log_bf <- log(bf_gp_vs_null)
 #' }
-compute_bayes_factor <- function(fit1, fit0) {
+compute_bayes_factor <- function(result1, result0) {
+  fit1 <- result1$fit
+  fit0 <- result0$fit
   # Compute marginal likelihoods via bridge sampling
   bridge1 <- bridgesampling::bridge_sampler(fit1)
   bridge0 <- bridgesampling::bridge_sampler(fit0)

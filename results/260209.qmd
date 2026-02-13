@@ -2,9 +2,10 @@
 title: " "
 author: " "
 date: "2026-02-09"
-format: 
+format:
   revealjs:
     css: styles.css
+    self-contained: true
 ---
 
 ## Progress This Week

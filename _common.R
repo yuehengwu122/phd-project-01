@@ -9,6 +9,7 @@ source("R/data_prep.R")
 source("R/diagnostics.R")
 source("R/bayes_factor.R")
 source("R/stan_fitting.R")
+source("R/model_management.R")
 
 # # initialization of model registry (one-time)
 # initialize_model_registry()

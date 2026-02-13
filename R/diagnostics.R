@@ -27,7 +27,16 @@ extract_diagnostics <- function(fit) {
 #' Print Quick Summary of Fit Results
 #' @param result Result object from run_analysis()
 #' @param key_params Character vector of key parameter names to display
-print_quick_summary <- function(result, key_params = c("delta", "lambda", "sigma", "beta0", "beta1")) {
+#' @param unstandardize Logical, if TRUE show unstandardized linear coefficients 
+#'   in a separate table (beta1_unstd = theta * sigma / x_range). Default: FALSE.
+#' @param predictor_names Optional names for predictors (used in unstandardized table)
+#' @param X_orig Original (unscaled) predictor matrix for computing unstandardized 
+#'   coefficients. If NULL (default), uses result$data$X (which may already be rescaled).
+print_quick_summary <- function(result, 
+                                key_params = c("delta", "lambda", "sigma", "beta0", "beta1"),
+                                unstandardize = FALSE,
+                                predictor_names = NULL,
+                                X_orig = NULL) {
   
   fit <- result$fit
   elapsed <- rstan::get_elapsed_time(fit)
@@ -39,6 +48,7 @@ print_quick_summary <- function(result, key_params = c("delta", "lambda", "sigma
   }
   cat("Fitting time:", round((elapsed[1,1] + elapsed[1,2]) / 3600, 2), "hours\n")
   cat("\n")
+
   
   # Extract diagnostics
   summary_df <- rstan::summary(fit)$summary
@@ -75,6 +85,409 @@ print_quick_summary <- function(result, key_params = c("delta", "lambda", "sigma
   } else {
     cat("No key parameters found.\n")
   }
+  
+  # Unstandardized linear coefficients table
+ if (unstandardize) {
+    cat("\n")
+    cat("Unstandardized linear coefficients (beta1_unstd = theta * sigma / x_range):\n")
+    
+    # Extract posterior draws
+    post <- rstan::extract(fit)
+    
+    if (is.null(post$theta) || is.null(post$sigma)) {
+      cat("  Cannot compute: theta or sigma not found in fit.\n")
+    } else {
+      theta_draws <- post$theta
+      sigma_draws <- post$sigma
+      
+      # Get X for computing x_range: use X_orig if provided, otherwise result$data$X
+      if (!is.null(X_orig)) {
+        X <- X_orig
+      } else {
+        X <- result$data$X
+      }
+      
+      if (is.null(X)) {
+        cat("  Cannot compute: X not found. Provide X_orig argument.\n")
+      } else {
+        if (is.vector(X)) X <- matrix(X, ncol = 1)
+        P <- ncol(X)
+        
+        # Compute x_range for each predictor (range of original X)
+        x_ranges <- apply(X, 2, function(x) diff(range(x)))
+        
+        # Set predictor names
+        if (is.null(predictor_names)) {
+          predictor_names <- colnames(X)
+          if (is.null(predictor_names)) {
+            predictor_names <- paste0("X", 1:P)
+          }
+        }
+        
+        # Compute unstandardized beta1 for each draw: beta1_unstd = theta * sigma / x_range
+        # theta_draws is (n_draws x P), sigma_draws is (n_draws)
+        if (is.matrix(theta_draws)) {
+          beta1_unstd <- sweep(theta_draws, 1, sigma_draws, "*")
+          beta1_unstd <- sweep(beta1_unstd, 2, x_ranges, "/")
+        } else {
+          # Single predictor case
+          beta1_unstd <- matrix(theta_draws * sigma_draws / x_ranges[1], ncol = 1)
+        }
+        
+        # Summarize: mean, sd, 2.5%, 50%, 97.5%
+        unstd_summary <- data.frame(
+          predictor = predictor_names,
+          mean = round(colMeans(beta1_unstd), 4),
+          sd = round(apply(beta1_unstd, 2, sd), 4),
+          `2.5%` = round(apply(beta1_unstd, 2, quantile, 0.025), 4),
+          `50%` = round(apply(beta1_unstd, 2, quantile, 0.50), 4),
+          `97.5%` = round(apply(beta1_unstd, 2, quantile, 0.975), 4),
+          check.names = FALSE
+        )
+        rownames(unstd_summary) <- NULL
+        print(unstd_summary, row.names = FALSE)
+      }
+    }
+  }
+}
+
+
+#' Summary of GP Model Fit
+#'
+#' Provides a clean, publication-ready summary of a fitted GP model,
+#' including linear effects, nonlinear effects, and GP hyperparameters.
+#' Similar in spirit to brms output but tailored for GP regression.
+#'
+#' @param result Result object from fit_model()
+#' @param predictor_names Optional names for predictors
+#' @param compute_sdr Logical, if TRUE compute Savage-Dickey ratios (default: TRUE)
+#' @param digits Number of digits to display (default: 4)
+#'
+#' @return Invisibly returns a list containing the summary tables
+#'
+#' @examples
+#' \dontrun{
+#' summary_gp_fit(fit_result)
+#' }
+summary_gp_fit <- function(result,
+                           predictor_names = NULL,
+                           compute_sdr = TRUE,
+                           digits = 4) {
+  
+  fit <- result$fit
+  post <- rstan::extract(fit)
+  summary_df <- rstan::summary(fit)$summary
+  elapsed <- rstan::get_elapsed_time(fit)
+  n_draws <- nrow(post$lp__)
+  
+  # ============================================================
+  # Header: Model Info
+  # ============================================================
+  cat("\n")
+  cat("Gaussian Process Regression Model\n")
+  cat(paste0(rep("=", 50), collapse = ""), "\n")
+  cat("Observations:", result$data$N, "\n")
+  if (!is.null(result$data$P)) {
+    cat("Predictors:  ", result$data$P, "\n")
+  }
+  cat("Draws:       ", n_draws, "post-warmup samples\n")
+  cat("Fit time:    ", round((elapsed[1,1] + elapsed[1,2]) / 3600, 2), "hours\n")
+  cat("\n")
+  
+  # ============================================================
+  # Convergence Summary (compact)
+  # ============================================================
+  max_rhat <- max(summary_df[, "Rhat"], na.rm = TRUE)
+  min_neff <- min(summary_df[, "n_eff"], na.rm = TRUE)
+  n_div <- sum(rstan::get_num_divergent(fit))
+  
+  if (max_rhat > 1.01 || n_div > 0) {
+    cat("Convergence: Rhat_max =", sprintf("%.3f", max_rhat), 
+        "| ESS_min =", round(min_neff),
+        "| Divergences =", n_div, "\n")
+    if (max_rhat > 1.01) cat("  Warning: Some Rhat > 1.01\n")
+    if (n_div > 0) cat("  Warning:", n_div, "divergent transitions\n")
+    cat("\n")
+  }
+  
+  # ============================================================
+  # Setup: Get X_orig, delta_prior, and predictor names from result
+  # ============================================================
+  X_scaled <- result$data$X
+  if (is.vector(X_scaled)) X_scaled <- matrix(X_scaled, ncol = 1)
+  P <- ncol(X_scaled)
+  
+  # Get X_orig from result (stored by fit_model)
+  X_orig <- result$orig$X
+  if (is.null(X_orig)) {
+    X_orig <- X_scaled
+    warning("X_orig not found in result; using scaled X. Unstandardized coefficients may be incorrect.")
+  }
+  if (is.vector(X_orig)) X_orig <- matrix(X_orig, ncol = 1)
+  
+  # Get delta_prior from result (stored by fit_model)
+  delta_prior <- result$delta_prior
+  if (is.null(delta_prior)) delta_prior <- "p1"
+  
+  if (is.null(predictor_names)) {
+    predictor_names <- colnames(X_orig)
+    if (is.null(predictor_names)) {
+      predictor_names <- paste0("X", 1:P)
+    }
+  }
+  
+  # ============================================================
+  # Compute SDR if requested
+  # ============================================================
+  sdr_linear <- rep(NA, P)
+  sdr_nonlinear <- rep(NA, P)
+  
+  if (compute_sdr) {
+    # Try to compute SDR using the bayes_factor.R functions
+    sdr_result <- tryCatch({
+      compute_savage_dickey_ratios(result, delta_prior = delta_prior)
+    }, error = function(e) {
+      warning("Could not compute SDR: ", e$message)
+      NULL
+    })
+    
+    if (!is.null(sdr_result)) {
+      sdr_linear <- as.numeric(sdr_result$SDR_linear)
+      sdr_nonlinear <- as.numeric(sdr_result$SDR_nonlinear)
+    }
+  }
+  
+  # ============================================================
+  # Linear Effects (unstandardized beta from pre-computed coef_orig)
+  # ============================================================
+  cat("Linear Effects:\n")
+  cat(paste0(rep("-", 70), collapse = ""), "\n")
+  
+  # Get pre-computed coefficients on original scale from fit_model
+  if (!is.null(result$coef_orig)) {
+    beta0_draws_orig <- result$coef_orig$beta0_draws
+    beta1_draws_orig <- result$coef_orig$beta1_draws
+  } else {
+    # Fallback: compute on the fly if coef_orig not available (legacy results)
+    beta1_draws <- post$beta1
+    y_bar <- mean(result$data$y)
+    x_bar <- colMeans(X_orig)
+    x_min <- apply(X_orig, 2, min)
+    x_max <- apply(X_orig, 2, max)
+    rng <- x_max - x_min
+    
+    if (is.matrix(beta1_draws)) {
+      beta1_draws_orig <- sweep(beta1_draws, 2, rng, "/")
+    } else {
+      beta1_draws_orig <- matrix(beta1_draws / rng[1], ncol = 1)
+    }
+    
+    if (is.matrix(beta1_draws_orig)) {
+      beta0_draws_orig <- as.vector(y_bar - beta1_draws_orig %*% x_bar)
+    } else {
+      beta0_draws_orig <- y_bar - beta1_draws_orig * x_bar
+    }
+  }
+  
+  # Get n_eff and Rhat from beta1 (use these for original scale beta)
+  beta1_rows <- grep("^beta1\\[", rownames(summary_df))
+  if (length(beta1_rows) == 0) {
+    beta1_rows <- grep("^beta1$", rownames(summary_df))
+  }
+  
+  if (length(beta1_rows) > 0) {
+    beta1_neff <- summary_df[beta1_rows, "n_eff"]
+    beta1_rhat <- summary_df[beta1_rows, "Rhat"]
+  } else {
+    beta1_neff <- rep(NA, P)
+    beta1_rhat <- rep(NA, P)
+  }
+  
+  # Compute log10(SDR) for linear effects
+  log_sdr_linear <- ifelse(is.na(sdr_linear) | sdr_linear <= 0, NA, log10(sdr_linear))
+  
+  # Build intercept row (beta0 is derived, so no individual Rhat/ESS)
+  intercept_row <- data.frame(
+    Predictor = "Intercept",
+    Estimate = round(mean(beta0_draws_orig), digits),
+    Est.Error = round(sd(beta0_draws_orig), digits),
+    `l-95% CI` = round(quantile(beta0_draws_orig, 0.025), digits),
+    `u-95% CI` = round(quantile(beta0_draws_orig, 0.975), digits),
+    Rhat = "—",
+    ESS = "—",
+    logSDR10 = "—",
+    check.names = FALSE
+  )
+  
+  # Build predictor rows
+  predictor_rows <- data.frame(
+    Predictor = predictor_names,
+    Estimate = round(colMeans(beta1_draws_orig), digits),
+    Est.Error = round(apply(beta1_draws_orig, 2, sd), digits),
+    `l-95% CI` = round(apply(beta1_draws_orig, 2, quantile, 0.025), digits),
+    `u-95% CI` = round(apply(beta1_draws_orig, 2, quantile, 0.975), digits),
+    Rhat = ifelse(is.na(beta1_rhat), "—", sprintf("%.3f", beta1_rhat)),
+    ESS = ifelse(is.na(beta1_neff), "—", as.character(round(beta1_neff))),
+    logSDR10 = ifelse(is.na(log_sdr_linear), "—", sprintf("%.2f", log_sdr_linear)),
+    check.names = FALSE
+  )
+  
+  # Combine intercept and predictors
+  linear_table <- rbind(intercept_row, predictor_rows)
+  
+  print(linear_table, row.names = FALSE, right = FALSE)
+  cat("\n")
+  
+  # ============================================================
+  # Gaussian Process Terms
+  # ============================================================
+  cat("Gaussian Process Terms:\n")
+  
+  # --- Standardized Magnitude (delta) ---
+  cat("  Standardized Magnitude (delta):\n")
+  cat(paste0(rep("-", 70), collapse = ""), "\n")
+  
+  # Get delta draws for display (always use delta for table display)
+  delta_draws <- post$delta
+  delta_param <- "delta"
+  
+  # Get n_eff and Rhat from delta
+  # Try indexed form first, then scalar form
+  delta_rows <- grep("^delta\\[", rownames(summary_df))
+  if (length(delta_rows) == 0) {
+    delta_rows <- grep("^delta$", rownames(summary_df))
+  }
+  
+  # Extract n_eff and Rhat, with fallback to NA if not found
+  if (length(delta_rows) > 0) {
+    delta_neff <- summary_df[delta_rows, "n_eff"]
+    delta_rhat <- summary_df[delta_rows, "Rhat"]
+  } else {
+    delta_neff <- rep(NA, P)
+    delta_rhat <- rep(NA, P)
+  }
+  
+  if (is.matrix(delta_draws)) {
+    delta_est <- colMeans(delta_draws)
+    delta_se <- apply(delta_draws, 2, sd)
+    delta_l95 <- apply(delta_draws, 2, quantile, 0.025)
+    delta_u95 <- apply(delta_draws, 2, quantile, 0.975)
+  } else {
+    delta_est <- mean(delta_draws)
+    delta_se <- sd(delta_draws)
+    delta_l95 <- quantile(delta_draws, 0.025)
+    delta_u95 <- quantile(delta_draws, 0.975)
+  }
+  
+  # Compute log10(SDR) for nonlinear effects
+  log_sdr_nonlinear <- ifelse(is.na(sdr_nonlinear) | sdr_nonlinear <= 0, NA, log10(sdr_nonlinear))
+  
+  nonlinear_table <- data.frame(
+    Predictor = predictor_names,
+    Estimate = round(delta_est, digits),
+    Est.Error = round(delta_se, digits),
+    `l-95% CI` = round(delta_l95, digits),
+    `u-95% CI` = round(delta_u95, digits),
+    Rhat = ifelse(is.na(delta_rhat), "—", sprintf("%.3f", delta_rhat)),
+    ESS = ifelse(is.na(delta_neff), "—", as.character(round(delta_neff))),
+    logSDR10 = ifelse(is.na(log_sdr_nonlinear), "—", sprintf("%.2f", log_sdr_nonlinear)),
+    check.names = FALSE
+  )
+  
+  print(nonlinear_table, row.names = FALSE, right = FALSE)
+  cat("\n")
+  
+  # --- Length Scale (lambda) ---
+  cat("  Length Scale (lambda):\n")
+  cat(paste0(rep("-", 70), collapse = ""), "\n")
+  
+  # Lambda (length-scale)
+  lambda_draws <- post$lambda
+  lambda_rows <- grep("^lambda\\[", rownames(summary_df))
+  if (length(lambda_rows) == 0) {
+    lambda_rows <- grep("^lambda$", rownames(summary_df))
+  }
+  
+  lambda_neff <- summary_df[lambda_rows, "n_eff"]
+  lambda_rhat <- summary_df[lambda_rows, "Rhat"]
+  
+  if (is.matrix(lambda_draws)) {
+    lambda_est <- colMeans(lambda_draws)
+    lambda_se <- apply(lambda_draws, 2, sd)
+    lambda_l95 <- apply(lambda_draws, 2, quantile, 0.025)
+    lambda_u95 <- apply(lambda_draws, 2, quantile, 0.975)
+    
+    lambda_table <- data.frame(
+      Predictor = predictor_names,
+      Estimate = round(lambda_est, digits),
+      Est.Error = round(lambda_se, digits),
+      `l-95% CI` = round(lambda_l95, digits),
+      `u-95% CI` = round(lambda_u95, digits),
+      Rhat = round(lambda_rhat, 3),
+      ESS = round(lambda_neff),
+      check.names = FALSE
+    )
+  } else {
+    lambda_table <- data.frame(
+      Predictor = "—",
+      Estimate = round(mean(lambda_draws), digits),
+      Est.Error = round(sd(lambda_draws), digits),
+      `l-95% CI` = round(quantile(lambda_draws, 0.025), digits),
+      `u-95% CI` = round(quantile(lambda_draws, 0.975), digits),
+      Rhat = round(lambda_rhat, 3),
+      ESS = round(lambda_neff),
+      check.names = FALSE
+    )
+  }
+  
+  print(lambda_table, row.names = FALSE, right = FALSE)
+  cat("\n")
+  
+  # ============================================================
+  # Residual
+  # ============================================================
+  cat("Residual:\n")
+  cat(paste0(rep("-", 70), collapse = ""), "\n")
+  
+  # Sigma (residual SD)
+  sigma_draws <- post$sigma
+  sigma_rows <- grep("^sigma$", rownames(summary_df))
+  sigma_est <- mean(sigma_draws)
+  sigma_se <- sd(sigma_draws)
+  sigma_l95 <- quantile(sigma_draws, 0.025)
+  sigma_u95 <- quantile(sigma_draws, 0.975)
+  sigma_neff <- summary_df[sigma_rows, "n_eff"]
+  sigma_rhat <- summary_df[sigma_rows, "Rhat"]
+  
+  sigma_table <- data.frame(
+    Parameter = "sigma",
+    Estimate = round(sigma_est, digits),
+    Est.Error = round(sigma_se, digits),
+    `l-95% CI` = round(sigma_l95, digits),
+    `u-95% CI` = round(sigma_u95, digits),
+    Rhat = round(sigma_rhat, 3),
+    ESS = round(sigma_neff),
+    check.names = FALSE
+  )
+  
+  print(sigma_table, row.names = FALSE, right = FALSE)
+  cat("\n")
+  
+  # ============================================================
+  # Footer: SDR interpretation guide
+  # ============================================================
+  if (compute_sdr) {
+    cat("logSDR10: log10 of Savage-Dickey Ratio (evidence for effect vs. no effect)\n")
+  }
+  cat(paste0(rep("=", 50), collapse = ""), "\n")
+  
+ # Return summary tables invisibly
+  invisible(list(
+    linear = linear_table,
+    gp_delta = nonlinear_table,
+    gp_lambda = lambda_table,
+    residual = sigma_table
+  ))
 }
 
 
@@ -487,229 +900,191 @@ plot_gp_trends_old <- function(result,
 
 
 #' Plot GP Trends for Exact GP Model
-#' @param result Result object from run_analysis()
-#' @param X Predictor matrix (N x P), should match the data used for fitting
-#' @param X_orig Original (unscaled) predictor matrix for plotting x-axis (default: NULL, uses X)
-#' @param predictor_names Optional names for predictors
+#' @param result Result object from fit_model()
 #' @param p Optional vector of predictor indices to plot (default: all)
-#' @param N_grid Number of grid points for prediction (default: 50)
+#' @param predictor_names Optional names for predictors
+#' @param N_grid Number of grid points for prediction (default: 80)
 #' @param ndraws Number of posterior draws to use (default: 400)
 #' @param seed Random seed for drawing samples (default: 1)
 #' @param model_name Optional model name to display in title (default: NULL, uses result$model_name)
 #' @param ylim Optional y-axis limits as a numeric vector of length 2 (default: NULL, auto)
 plot_gp_trends <- function(result,
-                           X = NULL,
-                           X_orig = NULL,
-                           predictor_names = NULL,
                            p = NULL,
-                           N_grid = 50,
+                           predictor_names = NULL,
+                           N_grid = 80,
                            ndraws = 400,
                            seed = 1,
                            model_name = NULL,
                            ylim = NULL) {
-  fit <- result$fit
-  y   <- result$data$y
-  if (is.null(X)) X <- result$data$X
-  if (is.vector(X)) X <- matrix(X, ncol = 1)
-  X <- as.matrix(X)
-  
-  # Use X_orig for plotting if provided, otherwise use X
-  if (is.null(X_orig)) {
-    X_plot <- X
-  } else {
-    if (is.vector(X_orig)) X_orig <- matrix(X_orig, ncol = 1)
-    X_plot <- as.matrix(X_orig)
-  }
+  stopifnot(!is.null(result$fit))
+  stopifnot(!is.null(result$data$X), !is.null(result$data$y))
+  stopifnot(!is.null(result$orig$X))  # original X (same columns as Stan X)
 
-  N <- nrow(X)
-  P <- ncol(X)
+  fit    <- result$fit
+  X_s    <- as.matrix(result$data$X)  # rescaled X used for Stan input (before centering)
+  y      <- as.numeric(result$data$y)
+  X_orig <- as.matrix(result$orig$X)  # original X for x-axis
+
+  if (is.vector(X_s))    X_s    <- matrix(X_s, ncol = 1)
+  if (is.vector(X_orig)) X_orig <- matrix(X_orig, ncol = 1)
+
+  N <- nrow(X_s)
+  P <- ncol(X_s)
+
+  stopifnot(nrow(X_orig) == N, ncol(X_orig) == P)
 
   if (is.null(p)) p_idx <- seq_len(P) else p_idx <- as.integer(p)
 
   if (is.null(predictor_names)) {
-    predictor_names <- colnames(X)
-    if (is.null(predictor_names)) predictor_names <- paste0("X", 1:P)
+    predictor_names <- colnames(X_orig)
+    if (is.null(predictor_names)) predictor_names <- paste0("X", seq_len(P))
   }
 
-  # ---- centering like Stan ----
+  # ---- Centering exactly as in Stan ----
   y_bar <- mean(y)
   y_c   <- y - y_bar
-  x_bar <- colMeans(X)
-  X_c   <- sweep(X, 2, x_bar, "-")
 
-  # ---- precompute Q_tr, R_tr for each predictor (span{1, x_cj}) ----
-  Q_tr <- vector("list", P)  # each N x 2
-  R_tr <- vector("list", P)  # each 2 x 2 (inverse of Q'Q)
-  xjxj <- numeric(P)
+  x_bar_s <- colMeans(X_s)
+  X_c     <- sweep(X_s, 2, x_bar_s, "-")  # N x P
 
-  for (j in 1:P) {
-    Q <- cbind(rep(1, N), X_c[, j])
-    R <- solve(crossprod(Q))
-    Q_tr[[j]] <- Q
-    R_tr[[j]] <- R
-    xjxj[j]   <- sum(X_c[, j]^2)
-  }
-
-  # ---- precompute D2 for each predictor (as in Stan transformed data) ----
-  D2_list <- vector("list", P)
-  for (j in 1:P) {
-    xj <- X_c[, j]
-    # squared distance matrix
-    D2 <- outer(xj, xj, "-")
-    D2 <- D2 * D2
-    diag(D2) <- 0
-    D2_list[[j]] <- D2
-  }
-
-  # ---- helper: SE kernel from D2 ----
-  se_cov_from_D2_R <- function(D2, alpha, l) {
-    a2 <- alpha^2
-    inv_l2 <- 1 / (l^2)
-    K <- a2 * exp(-0.5 * D2 * inv_l2)
+  # ---- Helpers: kernel + projection ----
+  se_cov_from_D2 <- function(D2, alpha, l) {
+    K <- (alpha^2) * exp(-0.5 * D2 / (l^2))
     diag(K) <- diag(K) + 1e-12
     K
   }
 
-  # ---- helper: Ktilde = K - PK - KP + PKP with P = Q R Q' ----
   ktilde_from_K <- function(K, Q, R) {
-    # U = K Q
-    U <- K %*% Q              # N x 2
-    # PK = Q (R U')
-    PK <- Q %*% (R %*% t(U))  # N x N
-    # M = Q' K Q = Q' U
-    M  <- t(Q) %*% U          # 2 x 2
-    # PKP = Q (R M R) Q'
+    U  <- K %*% Q
+    PK <- Q %*% (R %*% t(U))
+    M  <- t(Q) %*% U
     PKP <- Q %*% (R %*% M %*% R) %*% t(Q)
     Kt <- K - PK - t(PK) + PKP
     0.5 * (Kt + t(Kt))
   }
 
-  # ---- helper: orthogonalized cross-cov (grid x train) ----
   ktilde_cross <- function(Kc, Qn, Rn, Qt, Rt) {
-    # Kc is G x N
+    # (I - Pn) Kc (I - Pt) where Kc is G x N
+    T    <- Kc %*% Qt
+    KcPt <- (T %*% Rt) %*% t(Qt)
 
-    # Kc * Pt = (Kc*Qt) Rt Qt'
-    T  <- Kc %*% Qt                   # G x 2
-    KcPt <- (T %*% Rt) %*% t(Qt)      # G x N
+    S    <- t(Qn) %*% Kc
+    PnKc <- Qn %*% (Rn %*% S)
 
-    # Pn * Kc = Qn Rn (Qn' Kc)
-    S  <- t(Qn) %*% Kc                # 2 x N
-    PnKc <- Qn %*% (Rn %*% S)         # G x N
-
-    # Pn * KcPt
-    S2 <- t(Qn) %*% KcPt
+    S2     <- t(Qn) %*% KcPt
     PnKcPt <- Qn %*% (Rn %*% S2)
 
     Kc - PnKc - KcPt + PnKcPt
   }
 
-  # ---- extract posterior draws needed ----
-  post <- rstan::extract(fit, pars = c("mu","sigma","theta","delta","lambda"))
-  S <- length(post$mu)
+  # ---- Precompute training projectors + D2 on centered-rescaled scale ----
+  Q_tr <- vector("list", P)
+  R_tr <- vector("list", P)
+  D2_tr <- vector("list", P)
+
+  for (j in 1:P) {
+    Q <- cbind(1, X_c[, j])
+    R <- solve(crossprod(Q))
+    Q_tr[[j]] <- Q
+    R_tr[[j]] <- R
+
+    xj <- X_c[, j]
+    D2 <- outer(xj, xj, "-"); D2 <- D2 * D2; diag(D2) <- 0
+    D2_tr[[j]] <- D2
+  }
+
+  # ---- Draws ----
+  post <- rstan::extract(fit, pars = c("sigma","theta","delta","lambda"))
+  S_all <- length(post$sigma)
 
   set.seed(seed)
-  if (ndraws < S) idx <- sample.int(S, ndraws) else idx <- seq_len(S)
+  idx <- if (ndraws < S_all) sample.int(S_all, ndraws) else seq_len(S_all)
   nd <- length(idx)
 
-  mu_draw     <- post$mu[idx]
   sigma_draw  <- post$sigma[idx]
   theta_draw  <- post$theta[idx, , drop = FALSE]
   delta_draw  <- post$delta[idx, , drop = FALSE]
   lambda_draw <- post$lambda[idx, , drop = FALSE]
 
+  # scaling map used in preprocessing: x_s = (x - min) / range - 0.5
+  x_min <- apply(X_orig, 2, min)
+  x_rng <- apply(X_orig, 2, max) - x_min
+
   out_list <- vector("list", length(p_idx))
   raw_list <- vector("list", length(p_idx))
 
-  # ---- plotting loop ----
   for (kk in seq_along(p_idx)) {
     i <- p_idx[kk]
     x_name <- predictor_names[i]
-    
-    # grid in rescaled scale (for model calculations)
-    x_i <- X[, i]
-    xg_raw <- seq(min(x_i), max(x_i), length.out = N_grid)
-    xg_c   <- xg_raw - x_bar[i]
-    
-    # grid in original scale (for plotting)
-    x_i_plot <- X_plot[, i]
-    xg_plot <- seq(min(x_i_plot), max(x_i_plot), length.out = N_grid)
 
-    # grid-side Qn, Rn for projector span{1, xg_c}
-    Qn <- cbind(rep(1, N_grid), xg_c)
+    # grid on ORIGINAL scale for x-axis
+    xg_orig <- seq(min(X_orig[, i]), max(X_orig[, i]), length.out = N_grid)
+
+    # transform grid to model scale (rescaled then centered like Stan)
+    xg_s <- (xg_orig - x_min[i]) / x_rng[i]
+    xg_c <- xg_s - x_bar_s[i]
+
+    # grid-side projector for predictor i (span{1, xg_c})
+    Qn <- cbind(1, xg_c)
     Rn <- solve(crossprod(Qn))
 
-    # store per-draw curves
+    # cross distances on centered-rescaled scale
+    D2_cross <- outer(xg_c, X_c[, i], "-"); D2_cross <- D2_cross * D2_cross
+
     full_mat <- matrix(NA_real_, nd, N_grid)
     lin_mat  <- matrix(NA_real_, nd, N_grid)
 
-    # precompute grid->train squared distances for predictor i (depends only on X_c and xg_c)
-    x_train_c <- X_c[, i]
-    D2_cross <- outer(xg_c, x_train_c, "-")
-    D2_cross <- D2_cross * D2_cross
+    Qt <- Q_tr[[i]]
+    Rt <- R_tr[[i]]
 
     for (s in 1:nd) {
-      # parameters
       sigma <- sigma_draw[s]
-      mu    <- mu_draw[s]
-      beta1 <- sigma * theta_draw[s, ]
-      alpha <- sigma * delta_draw[s, ]  # alpha_j = delta_j * sigma
+      beta1 <- sigma * theta_draw[s, ]          # slopes on centered-rescaled scale
+      alpha <- sigma * delta_draw[s, ]
       lam   <- lambda_draw[s, ]
 
-      # build Sigma = sum_j Ktilde_j + sigma^2 I
+      # build training covariance
       Sigma <- matrix(0, N, N)
       for (j in 1:P) {
-        Kj <- se_cov_from_D2_R(D2_list[[j]], alpha[j], lam[j])
-        Q  <- Q_tr[[j]]
-        R  <- R_tr[[j]]
-        Sigma <- Sigma + ktilde_from_K(Kj, Q, R)
+        Kj <- se_cov_from_D2(D2_tr[[j]], alpha[j], lam[j])
+        Sigma <- Sigma + ktilde_from_K(Kj, Q_tr[[j]], R_tr[[j]])
       }
       diag(Sigma) <- diag(Sigma) + sigma^2
 
-      # resid = y_c - (mu + X_c beta1)
-      mean_vec <- as.numeric(mu + X_c %*% beta1)
-      resid <- y_c - mean_vec
+      # residual on centered-y scale (NO intercept in centered model)
+      resid <- y_c - as.numeric(X_c %*% beta1)
 
-      # a = Sigma^{-1} resid via Cholesky
-      L <- chol(Sigma)
-      v <- forwardsolve(t(L), resid)  # because chol() gives upper in R
-      a_vec <- backsolve(L, v)
+      # a = Sigma^{-1} resid
+      U <- chol(Sigma)                      # upper
+      v <- forwardsolve(t(U), resid)
+      a_vec <- backsolve(U, v)
 
-      # K_cross for predictor i (grid x train) using SE from D2_cross
+      # predictor-i GP mean at grid (conditional on data)
       Kc <- (alpha[i]^2) * exp(-0.5 * D2_cross / (lam[i]^2))
-
-      # orthogonalize cross-cov: (I-Pn) Kc (I-Pt)
-      Qt <- Q_tr[[i]]
-      Rt <- R_tr[[i]]
       Kc_tilde <- ktilde_cross(Kc, Qn, Rn, Qt, Rt)
+      f_mean <- as.numeric(Kc_tilde %*% a_vec)
 
-      f_mean <- as.numeric(Kc_tilde %*% a_vec)  # grid vector
-
-      beta0_orig <- mu + y_bar
-      lin <- beta0_orig + beta1[i] * xg_c
+      # trend on ORIGINAL y scale:
+      # y = y_bar + (xg_c * beta1_i) + f(xg_c)
+      lin  <- y_bar + beta1[i] * xg_c
       full <- lin + f_mean
 
       lin_mat[s, ]  <- lin
       full_mat[s, ] <- full
     }
 
-    # summarize
-    full_mean  <- colMeans(full_mat)
-    full_lower <- apply(full_mat, 2, quantile, 0.025)
-    full_upper <- apply(full_mat, 2, quantile, 0.975)
-    lin_mean   <- colMeans(lin_mat)
-
     out_list[[kk]] <- data.frame(
       predictor = factor(x_name, levels = predictor_names[p_idx]),
-      x = xg_plot,
-      full_mean = full_mean,
-      full_lo = full_lower,
-      full_hi = full_upper,
-      lin_mean = lin_mean
+      x = xg_orig,
+      full_mean = colMeans(full_mat),
+      full_lo   = apply(full_mat, 2, quantile, 0.025),
+      full_hi   = apply(full_mat, 2, quantile, 0.975),
+      lin_mean  = colMeans(lin_mat)
     )
 
     raw_list[[kk]] <- data.frame(
       predictor = factor(x_name, levels = predictor_names[p_idx]),
-      x = X_plot[, i],
+      x = X_orig[, i],
       y = y
     )
   }
@@ -717,41 +1092,27 @@ plot_gp_trends <- function(result,
   df  <- do.call(rbind, out_list)
   raw <- do.call(rbind, raw_list)
 
-  # Create plot title with model name if available
-  if (is.null(model_name)) {
-    model_name <- result$model_name
-  }
-  
-  plot_title <- if (!is.null(model_name)) {
-    paste("GP Trends:", model_name)
-  } else {
-    "GP Trends"
-  }
+  if (is.null(model_name)) model_name <- result$model_name
+  plot_title <- if (!is.null(model_name)) paste("GP Trends:", model_name) else "GP Trends"
 
-  p <- ggplot() +
-    geom_point(data = raw, aes(x = x, y = y), color = "black", size = 1) +
-    geom_ribbon(data = df, aes(x = x, ymin = full_lo, ymax = full_hi),
-                fill = "lightskyblue", alpha = 0.30) +
-    geom_line(data = df, aes(x = x, y = lin_mean),
-              color = "black", linetype = 2, linewidth = 0.9) +
-    geom_line(data = df, aes(x = x, y = full_mean),
-              color = "blue", linewidth = 1.1) +
-    facet_wrap(~ predictor, scales = "free_x") +
-    labs(title = plot_title, x = NULL, y = "y") +
-    theme_bw(base_size = 14) +
-    theme(
-      plot.title = element_text(size = 11),
-      strip.text = element_text(face = "bold", size = 10),
-      legend.position = "none", 
-      plot.margin = margin(10, 10, 10, 10),
-      panel.spacing = unit(1.2, "lines")
+  p <- ggplot2::ggplot() +
+    ggplot2::geom_point(data = raw, ggplot2::aes(x = x, y = y), color = "black", size = 1) +
+    ggplot2::geom_ribbon(data = df, ggplot2::aes(x = x, ymin = full_lo, ymax = full_hi),
+                         fill = "lightskyblue", alpha = 0.30) +
+    ggplot2::geom_line(data = df, ggplot2::aes(x = x, y = lin_mean),
+                       color = "black", linetype = 2, linewidth = 0.9) +
+    ggplot2::geom_line(data = df, ggplot2::aes(x = x, y = full_mean),
+                       color = "blue", linewidth = 1.1) +
+    ggplot2::facet_wrap(~ predictor, scales = "free_x") +
+    ggplot2::labs(title = plot_title, x = NULL, y = "y") +
+    ggplot2::theme_bw(base_size = 14) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(size = 11),
+      strip.text = ggplot2::element_text(face = "bold", size = 10),
+      legend.position = "none"
     )
-  
-  # Apply custom ylim if provided
-  if (!is.null(ylim)) {
-    p <- p + coord_cartesian(ylim = ylim)
-  }
-  
+
+  if (!is.null(ylim)) p <- p + ggplot2::coord_cartesian(ylim = ylim)
   p
 }
 
@@ -811,14 +1172,14 @@ plot_hsgp_trends <- function(object, X_orig = NULL, p = NULL, N_grid = 50, ndraw
   x_bar <- colMeans(X)
   X_c <- sweep(X, 2, x_bar, "-")
 
-  post <- rstan::extract(fit, pars = c("mu","sigma","theta","delta","lambda","z_basis"))
-  S <- length(post$mu)
+  post <- rstan::extract(fit, pars = c("beta0","sigma","theta","delta","lambda","z_basis"))
+  S <- length(post$beta0)
   if (S > ndraws) {
     set.seed(seed)
     idx <- sample.int(S, ndraws)
   } else idx <- seq_len(S)
 
-  mu_draw    <- post$mu[idx]
+  mu_draw    <- post$beta0[idx]
   sigma_draw <- post$sigma[idx]
 
   out_list <- vector("list", length(p_idx))
@@ -925,3 +1286,5 @@ plot_hsgp_trends <- function(object, X_orig = NULL, p = NULL, N_grid = 50, ndraw
   
   p
 }
+
+

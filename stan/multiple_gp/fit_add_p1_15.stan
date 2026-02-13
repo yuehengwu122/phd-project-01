@@ -3,16 +3,22 @@ functions {
   // K[n,m] = alpha^2 * exp(-0.5 * D2[n,m] / l^2)
   matrix se_cov_from_D2(matrix D2, real alpha, real l) {
     int N = rows(D2);
-    matrix[N, N] K;
+    matrix[N, N] K = rep_matrix(0.0, N, N);
     real a2 = square(alpha);
     real inv_l2 = inv(square(l));
 
-    for (n in 1:N) {
+    // diagonal
+    for (n in 1:N)
       K[n, n] = a2;
-      for (m in (n + 1):N) {
-        real k_nm = a2 * exp(-0.5 * D2[n, m] * inv_l2);
-        K[n, m] = k_nm;
-        K[m, n] = k_nm;
+
+    // upper triangle
+    if (N > 1) {
+      for (n in 1:(N - 1)) {
+        for (m in (n + 1):N) {
+          real k_nm = a2 * exp(-0.5 * D2[n, m] * inv_l2);
+          K[n, m] = k_nm;
+          K[m, n] = k_nm;
+        }
       }
     }
     return K;
@@ -38,13 +44,13 @@ transformed data {
     X_c[, j] = col(X, j) - x_bar[j];
   }
 
-  // ---- objects for JZS / mixture-of-g prior on theta ----
+  // ---- objects for mixture-of-g prior on theta ----
   matrix[P, P] XtX = crossprod(X_c);
   matrix[P, P] XtX_ridge = XtX + 1e-10 * diag_matrix(rep_vector(1.0, P));
   matrix[P, P] V_theta_base = inverse_spd(XtX_ridge);
   matrix[P, P] L_V_theta_base = cholesky_decompose(V_theta_base);
 
-  // ----- Precompute rank-2 projector ingredients for each predictor (like optimized model) -----
+  // ----- Precompute rank-2 projector ingredients for each predictor -----
   array[P] matrix[N, 2] Q_tr;
   array[P] matrix[2, 2] R_tr;
 
@@ -60,21 +66,24 @@ transformed data {
   // ----- Precompute squared distances for each predictor -----
   array[P] matrix[N, N] D2;
   for (j in 1:P) {
-    for (n in 1:N) {
-      D2[j][n, n] = 0;
-      for (m in (n + 1):N) {
-        real d = X_c[n, j] - X_c[m, j];
-        real d2 = d * d;
-        D2[j][n, m] = d2;
-        D2[j][m, n] = d2;
+    // initialize to zeros (safe)
+    D2[j] = rep_matrix(0.0, N, N);
+
+    if (N > 1) {
+      for (n in 1:(N - 1)) {
+        for (m in (n + 1):N) {
+          real d = X_c[n, j] - X_c[m, j];
+          real d2 = d * d;
+          D2[j][n, m] = d2;
+          D2[j][m, n] = d2;
+        }
       }
     }
   }
 }
 
 parameters {
-  // mixture-of-g prior scale for theta
-  // real<lower=0> g_theta;
+  // mixture-of-g prior scale for theta (log-scale)
   real log_g_theta;
 
   vector[P] z_theta; // standard normal
@@ -83,21 +92,19 @@ parameters {
   vector<lower=0>[P] delta;
 
   real<lower=0> sigma;
-  real mu;
 }
 
 transformed parameters {
-  // theta | g_theta ~ N(0,g_theta*(X'X)^{-1})
+  // theta | g_theta ~ N(0, g_theta * (X'X)^{-1})
   real<lower=0> g_theta = exp(log_g_theta);
   vector[P] theta = exp(0.5 * log_g_theta) * (L_V_theta_base * z_theta);
-  // vector[P] theta = sqrt(g_theta) * (L_V_theta_base * z_theta);
 
+  // GP marginal SD per predictor
   vector<lower=0>[P] alpha = delta * sigma;
 
-  // slopes on original (centered-x) scale
+  // linear slopes on centered-x scale
   vector[P] beta1 = sigma * theta;
 
-  // Prior buffer (for bridge sampling)
   real lprior = 0;
 
   for (j in 1:P)
@@ -108,14 +115,9 @@ transformed parameters {
 
   lprior += student_t_lpdf(sigma | 3, 0, 2.5) - student_t_lccdf(0 | 3, 0, 2.5);
 
-  lprior += student_t_lpdf(mu | 3, 0, 10);
-
-  // lprior += inv_gamma_lpdf(g_theta | 0.5, 0.5 * N);
-
-  // log_g_theta ~ normal(log(N), 0.5);
-  lprior += normal_lpdf(log(g_theta) | log(N), 0.5);
+  // log_g_theta ~ Normal(log(N), 0.5)
+  lprior += normal_lpdf(log_g_theta | log(N), 0.5);
 }
-
 
 model {
   target += lprior;
@@ -129,7 +131,7 @@ model {
     matrix[N, N] Kj = se_cov_from_D2(D2[j], alpha[j], lambda[j]);
     for (n in 1:N) Kj[n, n] += 1e-12;
 
-    // Efficient: Ktilde = K - PK - KP + PKP, where P = Q R Q'
+    // Ktilde = K - PK - KP + PKP, where P = Q R Q'
     matrix[N, 2] Q = Q_tr[j];
     matrix[2, 2] R = R_tr[j];
 
@@ -148,15 +150,16 @@ model {
     matrix[N, N] PKP = Q * B * Q';
 
     matrix[N, N] Ktilde = Kj - PK - PK' + PKP;
-    Ktilde = 0.5 * (Ktilde + Ktilde');
+    Ktilde = 0.5 * (Ktilde + Ktilde'); // symmetrize
 
     Sigma += Ktilde;
   }
 
-  for (n in 1:N) Sigma[n, n] += square(sigma);
+  for (n in 1:N)
+    Sigma[n, n] += square(sigma);
 
-  // Mean on centered scale: intercept + linear part
-  vector[N] mu_vec = rep_vector(mu, N) + X_c * beta1;
+  // Mean on centered scale: linear part
+  vector[N] mu_vec = X_c * beta1;
 
   {
     matrix[N, N] L = cholesky_decompose(Sigma);
