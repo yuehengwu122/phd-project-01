@@ -10,13 +10,13 @@
 #'
 #' @examples
 #' \dontrun{
-#' post_summary <- extract_posterior_summary(fit, 
+#' post_summary <- extract_posterior_summary(fit,
 #'                                           param_names = c("delta", "lambda"))
 #' }
 extract_posterior_summary <- function(fit, param_names = c("delta", "lambda")) {
   # Extract all posterior samples
   post <- rstan::extract(fit)
-  
+
   # Compute summaries for each requested parameter
   result <- list()
   for (param in param_names) {
@@ -25,7 +25,7 @@ extract_posterior_summary <- function(fit, param_names = c("delta", "lambda")) {
       result[[paste0(param, "_mean")]] <- mean(post[[param]])
     }
   }
-  
+
   return(result)
 }
 
@@ -57,11 +57,18 @@ extract_posterior_summary <- function(fit, param_names = c("delta", "lambda")) {
 #'   prior_density = 0.1487
 #' )
 #' }
-create_result_row <- function(N, prior, delta, lambda, 
-                              fit1, fit0, prior_density) {
+create_result_row <- function(
+  N,
+  prior,
+  delta,
+  lambda,
+  fit1,
+  fit0,
+  prior_density
+) {
   # Extract posterior samples
   post <- rstan::extract(fit1)
-  
+
   # Extract delta parameter (differs by prior version)
   if (prior == 1) {
     # Prior 1: delta is direct parameter
@@ -70,13 +77,13 @@ create_result_row <- function(N, prior, delta, lambda,
     # Prior 2: delta2 is sampled, take square root
     param_delta <- sqrt(post$delta2)
   }
-  
+
   # Compute Bayes Factor via bridge sampling
   bf10 <- compute_bayes_factor(fit1, fit0)
-  
+
   # Compute Savage-Dickey Bayes Factor
   sdr10 <- compute_savage_dickey_ratio(param_delta, prior_density)
-  
+
   # Return results as data frame row
   data.frame(
     N = N,

@@ -145,12 +145,15 @@ plot_partial_hsgp(fit_a4_dep_hsgp)
 ```{r}
 fit_a4_dep <- fit_model(
         gp_add_p1_15,
-        data = fit_data,
+        X = X,
+        y = y,
         chains = 2,
         iter = 5500,
         warmup = 500
 )
+summary_gp_fit(fit_a4_dep)
 ```
+
 saveRDS(fit_a4_dep, file = "analysis/application/fits/fit_a4_dep.rds")
 fit_a4_dep <- readRDS("analysis/application/fits/fit_a4_dep.rds")
 
@@ -188,4 +191,10 @@ compute_savage_dickey_ratios(fit_a4_dep_p2)
 ```{r}
 plot_posterior_delta(fit_a4_dep, plot_prior=TRUE, bins=50, ylim=c(0,0.8))
 plot_posterior_theta(fit_a4_dep, plot_prior=TRUE, bins=50, ylim=c(0,1.5))
+```
+
+
+
+```{r}
+apply(fit_a4_dep$coef_orig$beta1_draws[,c(5,9,11)], 2, mean)
 ```

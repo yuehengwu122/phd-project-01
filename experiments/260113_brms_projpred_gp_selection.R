@@ -9,7 +9,9 @@ fit_joint <- brm(
   data = df,
   family = gaussian(),
   backend = "rstan",
-  chains = 4, cores = 4, iter = 2000
+  chains = 4,
+  cores = 4,
+  iter = 2000
 )
 
 # 2) Additive GP (sum of 1D GPs): y = f1(x1)+f2(x2)+f3(x3)+f4(x4) + error
@@ -18,9 +20,10 @@ fit_additive <- brm(
   data = df,
   family = gaussian(),
   backend = "cmdstanr",
-  chains = 4, cores = 4, iter = 2000
+  chains = 4,
+  cores = 4,
+  iter = 2000
 )
 
 # Perform projpred variable selection on joint model
 refm_joint <- get_refmodel(fit_joint)
-

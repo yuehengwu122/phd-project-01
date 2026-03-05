@@ -15,8 +15,10 @@ source("R/model_management.R")
 # initialize_model_registry()
 
 # uniform ggplot theme
-theme_set(theme_minimal() + 
-  theme(text = element_text(size = 11)))
+theme_set(
+  theme_minimal() +
+    theme(text = element_text(size = 11))
+)
 
 # rstan options setting
 rstan::rstan_options(auto_write = TRUE)

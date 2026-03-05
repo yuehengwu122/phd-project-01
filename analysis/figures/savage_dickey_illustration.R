@@ -6,56 +6,65 @@
 # output_path: Optional path to save the plot (PNG format)
 # Returns: Creates base R plot demonstrating SDR method
 plot_savage_dickey_illustration <- function(output_path = NULL) {
-  
   set.seed(42)
-  
+
   # Create prior density: Half-Normal(0, 1)
   xgrid <- seq(0, 4, length.out = 500)
   prior_density <- 2 * dnorm(xgrid, mean = 0, sd = 1)
-  
+
   # Simulate posterior draws: centered at 0.5, more concentrated
   posterior_draws <- abs(rnorm(1e4, mean = 0.65, sd = 0.3))
-  
+
   # Estimate posterior density using logspline with nonnegative support
   library(logspline)
   fit_post <- logspline(posterior_draws, lbound = 0)
   posterior_density <- dlogspline(xgrid, fit_post)
-  
+
   # Evaluate densities at 0
   prior_0 <- 2 * dnorm(0, 0, 1)
   post_0 <- dlogspline(0, fit_post)
-  
+
   # Set up plotting parameters
-  par(cex.lab = 1.2, cex.main = 1.6, cex.axis = 1, mfrow = c(1,1))
-  
+  par(cex.lab = 1.2, cex.main = 1.6, cex.axis = 1, mfrow = c(1, 1))
+
   # Create histogram and overlay densities
-  hist(posterior_draws, freq = FALSE, breaks = 50, 
-       xlim = c(-0.5, 3), ylim = c(0, 1.5), las = 1,
-       border = FALSE, col = adjustcolor("grey", alpha.f = 0.4),
-       xlab = expression(theta), ylab = "Density", main = "", xaxt = "n")
-  
+  hist(
+    posterior_draws,
+    freq = FALSE,
+    breaks = 50,
+    xlim = c(-0.5, 3),
+    ylim = c(0, 1.5),
+    las = 1,
+    border = FALSE,
+    col = adjustcolor("grey", alpha.f = 0.4),
+    xlab = expression(theta),
+    ylab = "Density",
+    main = "",
+    xaxt = "n"
+  )
+
   # Add custom x-axis
   axis(1, at = seq(-0.5, 3, by = 0.5))
-  
+
   # Add density curves
   lines(xgrid, posterior_density, lwd = 2)
   lines(xgrid, prior_density, lwd = 1, col = 'blue')
-  
+
   # Add points at theta = 0
   points(0, post_0, pch = 19, cex = 1.5)
   points(0, prior_0, pch = 19, cex = 1.5, col = 'blue')
-  
+
   # Add vertical segments showing density evaluations
   segments(x0 = 0, y0 = 0, x1 = 0, y1 = post_0, col = "black", lty = 2, lwd = 2)
   segments(x0 = 0, y0 = 0, x1 = 0, y1 = prior_0, col = "blue", lty = 2)
-  
+
   # Add labels
   text(1.3, 1.05, "Posterior", cex = 1.5)
   text(1.8, 0.25, "Prior", cex = 1.5, col = 'blue')
-  
+
   text(-0.32, post_0, "post(0)", cex = 1.5)
   text(-0.32, prior_0, "prior(0)", cex = 1.5, col = 'blue')
-  
+
   # Save plot if output path provided
   if (!is.null(output_path)) {
     # Save current plot to file
@@ -74,7 +83,6 @@ plot_savage_dickey_illustration <- function(output_path = NULL) {
 
 # Quick display without saving:
 plot_savage_dickey_illustration()
-
 
 # ============================================================================
 # 2d savage-dickey ratio (abandoned)
@@ -160,7 +168,7 @@ plot_savage_dickey_illustration()
 #   scene = list(
 #     xaxis = list(title = "delta", showgrid = FALSE),
 #     yaxis = list(title = "xi", showgrid = FALSE),
-#     zaxis = list(title = "Density", showgrid = FALSE, range = c(0, 1)), 
+#     zaxis = list(title = "Density", showgrid = FALSE, range = c(0, 1)),
 #     aspectratio = list(x = 1, y = 1, z = 0.7)
 #   ),
 #   title = "Joint Prior Density"
@@ -174,7 +182,6 @@ plot_savage_dickey_illustration()
 
 # # delta <- fitGP_post$xi_1[,1, 1]
 # # xi <- fitGP_post$xi_1[,1, 4]
-
 
 # # Estimate 2D density over grid
 # grid_n <- 100
@@ -246,7 +253,7 @@ plot_savage_dickey_illustration()
 #   scene = list(
 #     xaxis = list(title = "delta", showgrid = FALSE),
 #     yaxis = list(title = "xi", showgrid = FALSE),
-#     zaxis = list(title = "Density", showgrid = FALSE), 
+#     zaxis = list(title = "Density", showgrid = FALSE),
 #     aspectratio = list(x = 1, y = 1, z = 0.7)
 #   ),
 #   title = "Joint Posterior Density"
