@@ -24,3 +24,12 @@ Thumbs.db
 
 # Output files
 *.pdf
+
+# Data and results (not published)
+data/
+results/
+
+# Notes and personal files
+obsidian/
+.obsidian/
+experiment/
