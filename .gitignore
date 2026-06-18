@@ -22,14 +22,8 @@ Thumbs.db
 *_cache/
 *_files/
 
-# Output files
-*.pdf
+# Large binary Stan fit objects
+*.rds
 
-# Data and results (not published)
-data/
-results/
-
-# Notes and personal files
-obsidian/
-.obsidian/
-experiment/
+# Paper repo is a separate git repo
+phd-paper-01/
