@@ -1,0 +1,277 @@
+---
+title: "Simulation: Bayes Factor Check (delta=0 and delta=3)"
+description: "Source: [experiment/260401_sim3_bf_check.qmd]"
+date: today
+execute:
+  echo: false
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = normalizePath(".."))
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.width = 10, fig.height = 6)
+```
+
+```{r load-packages}
+library(ggplot2)
+library(logspline)
+library(dplyr)
+library(tidyr)
+library(knitr)
+
+source("src/moment_prior.R")
+source("src/bayes_factor.R")
+```
+
+## Data
+
+```{r load-data}
+d0_draws <- read.csv("data/results_sim3_rstan_posterior_draws_d0_rep1.csv")
+d3_draws <- read.csv("data/results_sim3_rstan_posterior_draws_d3_rep1.csv")
+draws_all <- rbind(d0_draws, d3_draws)
+
+# order as factor with levels d0..d3
+draws_all$order <- factor(draws_all$order, levels = c("d0", "d1", "d2", "d3"))
+```
+
+## Bridge Sampling BF (reference values)
+
+```{r bridge-values}
+bridge_vals <- data.frame(
+  delta_true = c(rep(0, 16), rep(3, 16)),
+  N = rep(c(20, 20, 20, 20, 50, 50, 50, 50, 100, 100, 100, 100, 200, 200, 200, 200), 2),
+  order = factor(rep(c("d0","d1","d2","d3"), 8), levels = c("d0","d1","d2","d3")),
+  log_bf10_bridge = c(
+    # delta = 0
+    -0.695, -0.593, -0.839, -0.0602,
+    -1.13,  -1.17,  -1.46,  -0.962,
+    -0.920, -1.64,  -1.96,  -1.94,
+    -1.51,  -1.74,  -2.27,  -1.87,
+    # delta = 3
+     1.52,   1.64,   1.68,   1.68,
+    16.2,   16.3,   16.4,   16.4,
+    27.2,   27.5,   27.6,   27.5,
+    54.1,   54.4,   54.4,   54.4
+  )
+)
+```
+
+## Compute Logspline and ECDF BFs (eps = 0.2)
+
+```{r compute-bfs}
+EPS <- 0.2
+
+compute_bf_row <- function(draws, d_order, method) {
+  bf10_interval_null_delta(
+    delta_draws = draws,
+    d_order     = d_order,
+    eps         = EPS,
+    method      = method,
+    return_log  = TRUE
+  )$log_bf10
+}
+
+# Compute one row per (delta_true, N, order)
+bf_computed <- draws_all |>
+  group_by(delta_true, N, order) |>
+  summarise(
+    log_bf10_logspline = compute_bf_row(
+      delta_draw,
+      d_order = as.integer(sub("d", "", order[1])),
+      method  = "logspline"
+    ),
+    log_bf10_ecdf = compute_bf_row(
+      delta_draw,
+      d_order = as.integer(sub("d", "", order[1])),
+      method  = "ecdf"
+    ),
+    .groups = "drop"
+  )
+```
+
+## Result Table
+
+```{r result-table}
+result_tbl <- bridge_vals |>
+  left_join(bf_computed, by = c("delta_true", "N", "order")) |>
+  mutate(
+    log_bf10_bridge    = round(log_bf10_bridge,    3),
+    log_bf10_logspline = round(log_bf10_logspline, 3),
+    log_bf10_ecdf      = round(log_bf10_ecdf,      3)
+  ) |>
+  rename(
+    `log_bf10_raw (ecdf, eps=0.2)`      = log_bf10_ecdf,
+    `log_bf10_logspline (eps=0.2)`      = log_bf10_logspline
+  )
+
+kable(
+  result_tbl,
+  caption = "Bayes Factor comparison: bridge sampling vs logspline vs ECDF (eps = 0.2)",
+  align   = c("c","c","c","r","r","r")
+)
+```
+
+## BF Comparison Plot
+
+```{r bf-plot, fig.height=7, fig.width=11}
+# Pivot the three BF columns to long format for ggplot
+bf_long <- result_tbl |>
+  rename(
+    bridge    = log_bf10_bridge,
+    logspline = `log_bf10_logspline (eps=0.2)`,
+    ecdf      = `log_bf10_raw (ecdf, eps=0.2)`
+  ) |>
+  pivot_longer(
+    cols      = c(bridge, logspline, ecdf),
+    names_to  = "method",
+    values_to = "log_bf10"
+  ) |>
+  mutate(
+    method      = factor(method,
+                         levels = c("bridge", "logspline", "ecdf"),
+                         labels = c("Bridge", "Logspline (eps=0.2)", "ECDF (eps=0.2)")),
+    delta_label = factor(
+      ifelse(delta_true == 0, "True delta == 0", "True delta == 3"),
+      levels = c("True delta == 0", "True delta == 3")
+    )
+  )
+
+# Reference lines: BF = 1 (log = 0) and common evidence thresholds
+thresh <- data.frame(
+  yintercept = c(0, log(3), log(10), -log(3), -log(10)),
+  label      = c("BF=1", "BF=3", "BF=10", "BF=1/3", "BF=1/10")
+)
+
+ggplot(bf_long, aes(x = N, y = log_bf10,
+                    color = method, shape = method, linetype = method)) +
+  geom_hline(yintercept = 0, linewidth = 0.4, color = "grey40") +
+  geom_hline(yintercept =  log(3),  linewidth = 0.3, color = "grey60", linetype = "dashed") +
+  geom_hline(yintercept = -log(3),  linewidth = 0.3, color = "grey60", linetype = "dashed") +
+  geom_line(linewidth = 0.75) +
+  geom_point(size = 2.2) +
+  facet_grid(
+    delta_label ~ order,
+    labeller = labeller(delta_label = label_value, order = label_value),
+    scales   = "free_y"
+  ) +
+  scale_x_continuous(breaks = c(20, 50, 100, 200)) +
+  scale_color_manual(
+    values = c("Bridge" = "#1b7837",
+               "Logspline (eps=0.2)" = "#2166ac",
+               "ECDF (eps=0.2)"      = "#d6604d")
+  ) +
+  scale_shape_manual(
+    values = c("Bridge" = 16, "Logspline (eps=0.2)" = 17, "ECDF (eps=0.2)" = 15)
+  ) +
+  scale_linetype_manual(
+    values = c("Bridge" = "solid", "Logspline (eps=0.2)" = "dashed", "ECDF (eps=0.2)" = "dotted")
+  ) +
+  labs(
+    title    = "log BF10 by method, prior order, N, and true delta",
+    subtitle = "Dashed grey lines: log(BF) = ±log(3) (moderate evidence threshold)",
+    x        = "Sample size N",
+    y        = "log BF10",
+    color    = "Method", shape = "Method", linetype = "Method"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    plot.title     = element_text(face = "bold", size = 12),
+    plot.subtitle  = element_text(size = 10, color = "grey40"),
+    strip.text     = element_text(face = "bold"),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  )
+```
+
+## Posterior Histograms of Delta
+
+```{r plot-helper}
+#' Plot posterior histograms of delta from raw draws
+#' Mimics plot_posterior_delta() but accepts a data.frame of draws
+#'
+#' @param df Data.frame with columns delta_draw and order (factor)
+#' @param title Plot title
+#' @param xlim Optional x-axis limits
+#' @param bins  Number of histogram bins
+plot_posterior_delta_draws <- function(df, title = NULL, xlim = NULL, bins = 40) {
+  # Overlay moment prior for each order
+  x_max <- quantile(df$delta_draw, 0.995, na.rm = TRUE)
+  x_seq <- seq(0, x_max, length.out = 300)
+
+  prior_df <- do.call(rbind, lapply(levels(df$order), function(ord) {
+    d <- as.integer(sub("d", "", ord))
+    kap <- get_kappa(d)
+    data.frame(
+      x     = x_seq,
+      y     = prior_moment_density(x_seq, d = d, kappa = kap),
+      order = factor(ord, levels = levels(df$order))
+    )
+  }))
+
+  p <- ggplot(df, aes(x = delta_draw)) +
+    geom_histogram(
+      aes(y = after_stat(density)),
+      bins = bins, fill = "steelblue", alpha = 0.6, color = "white"
+    ) +
+    geom_line(
+      data = prior_df, aes(x = x, y = y),
+      color = "firebrick", linewidth = 0.8
+    ) +
+    facet_wrap(~order, ncol = 4, scales = "free_y") +
+    labs(
+      title = title,
+      x     = expression(delta),
+      y     = "Density"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title    = element_text(size = 11, face = "bold"),
+      strip.text    = element_text(face = "bold"),
+      panel.grid    = element_blank(),
+      panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.5)
+    )
+
+  if (!is.null(xlim))
+    p <- p + coord_cartesian(xlim = xlim)
+
+  p
+}
+```
+
+### True delta = 0
+
+```{r plots-d0, results='asis', fig.height=4}
+sub_d0 <- draws_all |> filter(delta_true == 0)
+
+for (n_val in c(20, 50, 100, 200)) {
+  cat(sprintf("\n#### N = %d\n\n", n_val))
+  df_sub <- sub_d0 |> filter(N == n_val)
+  p <- plot_posterior_delta_draws(
+    df_sub,
+    title = sprintf("Posterior of delta | true delta = 0, N = %d", n_val)
+  )
+  print(p)
+  cat("\n")
+}
+```
+
+### True delta = 3
+
+```{r plots-d3, results='asis', fig.height=4}
+sub_d3 <- draws_all |> filter(delta_true == 3)
+
+for (n_val in c(20, 50, 100, 200)) {
+  cat(sprintf("\n#### N = %d\n\n", n_val))
+  df_sub <- sub_d3 |> filter(N == n_val)
+  p <- plot_posterior_delta_draws(
+    df_sub,
+    title = sprintf("Posterior of delta | true delta = 3, N = %d", n_val)
+  )
+  print(p)
+  cat("\n")
+}
+```
