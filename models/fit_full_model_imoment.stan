@@ -21,11 +21,10 @@ data {
   matrix[N, P] X;
   vector[N] y;
 
-  int<lower=0> d_order;
-  real<lower=0> kappa_delta;
-  int<lower=1> df_delta;
-  real<lower=0> s_delta;
-  real logC_base;
+  int<lower=1> d_order;
+  real<lower=0> tau_delta;
+  real<lower=0> nu_delta;
+  real logC_imoment;
 }
 
 transformed data {
@@ -84,14 +83,19 @@ transformed parameters {
   real lprior = 0;
 
   {
-    real s_eff = s_delta * kappa_delta;
     for (j in 1:P) {
       real delt = delta[j];
-      lprior += student_t_lpdf(delt | df_delta, 0, s_eff)
-                - student_t_lccdf(0 | df_delta, 0, s_eff);
-      if (d_order > 0)
-        lprior += d_order * log(delt);
-      lprior -= (logC_base + d_order * log(kappa_delta));
+      real log_delt = log(delt);
+      real tau_over_d2 = tau_delta / square(delt);
+
+      real penalty;
+      if (d_order == 1) penalty = tau_over_d2;
+      else if (d_order == 2) penalty = square(tau_over_d2);
+      else if (d_order == 3) penalty = tau_over_d2 * square(tau_over_d2);
+      else if (d_order == 4) penalty = square(square(tau_over_d2));
+      else penalty = pow(tau_over_d2, d_order);
+
+      lprior += -(nu_delta + 1) * log_delt - penalty - logC_imoment;
     }
   }
 

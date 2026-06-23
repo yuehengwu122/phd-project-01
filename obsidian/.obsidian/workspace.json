@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "02 Experiment Log/Untitled.md",
+                "file": "01 Daily Log/2026-06.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Untitled"
+              "title": "2026-06"
             }
           }
         ]
@@ -185,8 +185,8 @@
   },
   "active": "ff3b6fcef55cb315",
   "lastOpenFiles": [
-    "BF vs SDR, fitting with one parameter fixed, range of length-scale.md",
     "02 Experiment Log/Untitled.md",
+    "BF vs SDR, fitting with one parameter fixed, range of length-scale.md",
     "Bridge Sampling vs. Importance Sampling.md",
     "Welcome.md",
     "Week25.md",

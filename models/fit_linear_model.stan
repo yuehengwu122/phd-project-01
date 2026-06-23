@@ -6,6 +6,9 @@ data {
 }
 
 transformed data {
+  real ig_a = 2.0;
+  real ig_b = 0.5 * N;
+
   // ----- Center y and each column of X -----
   real y_bar = mean(y);
   vector[N] y_c = y - y_bar;
@@ -40,8 +43,11 @@ transformed parameters {
   lprior += student_t_lpdf(sigma | 3, 0, 2.5)
             - student_t_lccdf(0 | 3, 0, 2.5);
 
-  // log_g_theta prior
-  lprior += normal_lpdf(log_g_theta | log(N), 0.5);
+  // ---- IG prior on g_theta = exp(log_g_theta) ----
+  {
+    real g_theta = exp(log_g_theta);
+    lprior += inv_gamma_lpdf(g_theta | ig_a, ig_b) + log_g_theta;
+  }
 }
 
 model {

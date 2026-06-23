@@ -35,6 +35,8 @@ df |>
 fit_d0 <- fit_model(X, y, model = "full", d_order = 0,
                      chains = 2, iter = 5500, warmup = 500)
 
+
+
 # --- Fit: non-local prior order 2 ---
 fit_d2 <- fit_model(X, y, model = "full", d_order = 2,
                      chains = 2, iter = 5500, warmup = 500)
@@ -65,3 +67,73 @@ plot_gp_trends(fit_d2, title = "GP Trends (moment prior, d=2)", ylim = c(-2, 3))
 saveRDS(fit_d0,  "results/fit_03_diabetes_d0.rds")
 saveRDS(fit_d2,  "results/fit_03_diabetes_d2.rds")
 saveRDS(fit_lin, "results/fit_03_diabetes_linear.rds")
+
+
+
+# --- Fit: GAM (mgcv) ---
+predictors <- colnames(X)
+data <- df
+
+formula_mgcv <- as.formula(paste0(
+  "y ~ ",
+  paste(predictors, collapse = " + "),
+  " + ",
+  paste0("s(", predictors, ", bs='tp', m=1, k=10)", collapse = " + ")
+))
+gam_mgcv <- mgcv::gam(formula_mgcv, data = data)
+summary(gam_mgcv)
+
+# --- Extract and save results for the selected fit ---
+selected_fit <- gam_mgcv
+summary_gam <- summary(selected_fit)
+
+# Predicted values (with standard errors) on the original data
+pred_gam <- mgcv::predict.gam(selected_fit, newdata = data, se.fit = TRUE)
+gam_results <- data.frame(
+  y = data$y,
+  fitted = pred_gam$fit,
+  se = pred_gam$se.fit,
+  residual = data$y - pred_gam$fit
+)
+
+# --- Plot estimated trend for each predictor using GAM predictions ---
+predictors <- colnames(X)
+
+trend_list <- lapply(predictors, function(pred) {
+  grid <- seq(min(data[[pred]], na.rm = TRUE), max(data[[pred]], na.rm = TRUE), length.out = 120)
+  medians <- apply(X, 2, median)
+  newdata <- as.data.frame(matrix(nrow = length(grid), ncol = length(predictors)))
+  colnames(newdata) <- predictors
+  for (j in seq_along(predictors)) newdata[[predictors[j]]] <- medians[j]
+  newdata[[pred]] <- grid
+  p <- mgcv::predict.gam(selected_fit, newdata = newdata, se.fit = TRUE)
+  data.frame(
+    predictor = pred,
+    value = grid,
+    fitted = p$fit,
+    se = p$se.fit,
+    lower = p$fit - 2 * p$se.fit,
+    upper = p$fit + 2 * p$se.fit
+  )
+})
+
+trend_df <- do.call(rbind, trend_list)
+
+# prepare long-form original data for overlaying scatter points
+df_long <- data |>
+  tidyr::pivot_longer(cols = tidyselect::all_of(predictors), names_to = "predictor", values_to = "value")
+
+plot_trends <- ggplot2::ggplot(trend_df, ggplot2::aes(x = value, y = fitted)) +
+  ggplot2::geom_point(data = df_long, ggplot2::aes(x = value, y = y), size = 0.7, alpha = 0.5) +
+  ggplot2::geom_ribbon(ggplot2::aes(ymin = lower, ymax = upper), fill = "grey80", alpha = 0.6) +
+  ggplot2::geom_line(color = "blue") +
+  ggplot2::facet_wrap(~predictor, scales = "free_x") +
+  ggplot2::labs(title = "Estimated GAM trends (others at median)", x = "Predictor value", y = "Fitted y")
+
+plot_trends
+
+if (!dir.exists("results")) dir.create("results", recursive = TRUE)
+ggplot2::ggsave("results/gam_trends_03_diabetes.png", plot_trends, width = 11, height = 6)
+
+## mark todo completed
+## (update the todo list)

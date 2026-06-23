@@ -1,13 +1,20 @@
 # ============================================================
 # Bayes Factor Computation
 #
-# Two approaches:
-# 1. Interval-null BF via Savage-Dickey density/interval ratios
-# 2. Bridge sampling BF via marginal likelihood estimation
+# Working decisions reflected here:
+# 1. Linear effects use point-null Savage-Dickey ratios at theta = 0.
+#    Posterior density at zero is estimated with dlogspline().
+# 2. Nonlinear effects use interval-null Bayes factors for delta < eps,
+#    with eps fixed by default at 0.2.
+#    Posterior interval mass is estimated with plogspline().
+# 3. Direct fitting under each non-local prior is retained, but we also
+#    support reweighting a local/base-prior BF to a target non-local prior.
 # ============================================================
 
+BF_EPSILON_DEFAULT <- 0.2
 
-# --- Posterior density/interval estimation (logspline) ---
+
+# --- Nonlinear posterior estimation via logspline ---
 
 #' Estimate posterior P(delta < eps | y) via logspline
 #'
@@ -15,10 +22,10 @@
 #' full distribution (heavy tails).
 #'
 #' @param x Posterior draws of delta (non-negative)
-#' @param eps Epsilon threshold (>= 0)
+#' @param eps Interval-null threshold (>= 0)
 #' @param max_attempts Number of tail-trimming levels to try
 #' @return Scalar probability estimate, or NA on failure
-post_prob_delta_logspline <- function(x, eps, max_attempts = 5) {
+post_prob_delta_logspline <- function(x, eps = BF_EPSILON_DEFAULT, max_attempts = 5) {
   x <- x[is.finite(x) & x >= 0]
   stopifnot(length(x) > 10, is.finite(eps), eps >= 0)
 
@@ -47,89 +54,145 @@ post_prob_delta_logspline <- function(x, eps, max_attempts = 5) {
 }
 
 
-#' Estimate posterior P(delta < eps | y) via empirical CDF
-#'
-#' Fallback method when logspline is unreliable.
-#' Returns both the point estimate and its Monte Carlo standard error.
-#'
-#' @param x Posterior draws of delta
-#' @param eps Epsilon threshold
-#' @return Named list with `post0` (estimate) and `mcse` (MC standard error)
-post_prob_delta_ecdf <- function(x, eps) {
-  x <- x[is.finite(x) & x >= 0]
-  p_hat <- mean(x < eps)
-  mcse <- sqrt(p_hat * (1 - p_hat) / length(x))
-  list(post0 = p_hat, mcse = mcse)
-}
-
-
-#' Vectorized posterior probability computation
-#'
-#' @param x Posterior draws of delta
-#' @param eps_vals Vector of epsilon thresholds
-#' @param method "logspline" or "ecdf"
-#' @return data.frame with columns `post0` and (for ecdf) `mcse`
-post_prob_delta_vec <- function(
-  x, eps_vals,
-  method = c("logspline", "ecdf")
-) {
-  method <- match.arg(method)
-
-  if (method == "logspline") {
-    post0 <- vapply(eps_vals, function(e) post_prob_delta_logspline(x, e), numeric(1))
-    return(data.frame(post0 = post0, mcse = NA_real_))
-  }
-
-  res <- lapply(eps_vals, function(e) post_prob_delta_ecdf(x, e))
-  data.frame(
-    post0 = vapply(res, `[[`, numeric(1), "post0"),
-    mcse  = vapply(res, `[[`, numeric(1), "mcse")
-  )
-}
-
-
-# --- Interval-null BF for delta (nonlinear effect) ---
+# --- Nonlinear interval-null BF ---
 
 #' Compute interval-null BF10 for delta
 #'
 #' BF10 = P(delta < eps) / P(delta < eps | y)
 #'
-#' where the prior is the moment prior of order d_order,
-#' and the posterior is estimated via logspline.
+#' The prior is the moment prior of order d_order. The posterior interval
+#' probability is estimated by logspline.
 #'
 #' @param delta_draws Posterior draws of delta (vector, non-negative)
 #' @param d_order Moment prior order (0, 1, 2, 3)
-#' @param eps Vector of epsilon thresholds
-#' @param method Posterior estimation method ("logspline" or "ecdf")
-#' @param return_log If TRUE, return log(BF10) (default: TRUE)
-#' @return data.frame with columns: epsilon, prior0, post0, log_bf10 (or bf10).
-#'   When method = "ecdf", also includes post0_mcse.
+#' @param eps Interval-null threshold. Defaults to 0.2.
+#' @param return_log If TRUE, return log(BF10)
+#' @return data.frame with columns epsilon, prior0, post0, and log_bf10 or bf10
 bf10_interval_null_delta <- function(
   delta_draws,
   d_order,
-  eps,
-  method = c("logspline", "ecdf"),
+  eps = BF_EPSILON_DEFAULT,
   return_log = TRUE
 ) {
-  method <- match.arg(method)
-
   delta_draws <- as.numeric(delta_draws)
   delta_draws <- delta_draws[is.finite(delta_draws) & delta_draws >= 0]
 
   prior0 <- prior_prob_delta(d_order, eps)
-  post0_df <- post_prob_delta_vec(delta_draws, eps, method = method)
+  post0 <- post_prob_delta_logspline(delta_draws, eps = eps)
 
-  bf10 <- prior0 / post0_df$post0
+  bf10 <- prior0 / post0
   if (return_log) bf10 <- log(bf10)
 
-  out <- data.frame(epsilon = eps, prior0 = prior0, post0 = post0_df$post0)
-  if (method == "ecdf") out$post0_mcse <- post0_df$mcse
+  out <- data.frame(epsilon = eps, prior0 = prior0, post0 = post0)
   if (return_log) out$log_bf10 <- bf10 else out$bf10 <- bf10
   out
 }
 
 
-# --- Savage-Dickey ratio for theta (linear effect) ---
+# --- Reweighting from a base/local prior ---
+
+#' Compute the log reweighting adjustment from a base prior to a target prior
+#'
+#' For posterior draws sampled under the base prior,
+#'
+#'   log adjustment = log E_base[ pi_target(delta) / pi_base(delta) | y ]
+#'
+#' @param delta_draws Posterior draws of delta under the base fit
+#' @param target_order Target moment-prior order
+#' @param base_order Base moment-prior order
+#' @return Scalar log adjustment
+compute_log_reweight_adjustment <- function(
+  delta_draws,
+  target_order,
+  base_order = 0L
+) {
+  stopifnot(target_order %in% 0:3, base_order %in% 0:3)
+
+  draws <- as.numeric(delta_draws)
+  draws <- draws[is.finite(draws) & draws >= 0]
+  if (!length(draws)) {
+    return(NA_real_)
+  }
+
+  log_target <- log(prior_moment_density(draws, target_order, get_kappa(target_order)))
+  log_base <- log(prior_moment_density(draws, base_order, get_kappa(base_order)))
+  log_weights <- log_target - log_base
+
+  max_log_weight <- max(log_weights)
+  max_log_weight + log(mean(exp(log_weights - max_log_weight)))
+}
+
+
+#' Reweight a base log-BF to a target moment-prior order
+#'
+#' @param base_log_bf Log BF computed under the base prior
+#' @param delta_draws Posterior draws of delta from the base fit
+#' @param target_order Target moment-prior order
+#' @param base_order Base moment-prior order
+#' @return data.frame with the base log-BF, log adjustment, and reweighted log-BF
+reweight_log_bf <- function(
+  base_log_bf,
+  delta_draws,
+  target_order,
+  base_order = 0L
+) {
+  log_adjustment <- compute_log_reweight_adjustment(
+    delta_draws = delta_draws,
+    target_order = target_order,
+    base_order = base_order
+  )
+
+  data.frame(
+    base_order = base_order,
+    target_order = target_order,
+    log_bf10_base = base_log_bf,
+    log_reweight_adjustment = log_adjustment,
+    log_bf10_reweighted = base_log_bf + log_adjustment
+  )
+}
+
+
+#' Compute a reweighted interval-null BF for one predictor from a base fit
+#'
+#' @param result_base gp_fit object, typically fitted with d_order = 0
+#' @param target_order Target moment-prior order
+#' @param predictor Predictor index
+#' @param eps Interval-null threshold. Defaults to 0.2.
+#' @return data.frame with base and reweighted log-BFs
+compute_reweighted_nonlinear_bf <- function(
+  result_base,
+  target_order,
+  predictor = 1L,
+  eps = BF_EPSILON_DEFAULT
+) {
+  stopifnot(inherits(result_base, "gp_fit"))
+
+  post <- rstan::extract(result_base$fit)
+  delta_draws_all <- post$delta
+  predictor <- as.integer(predictor)
+
+  delta_draws <- if (is.matrix(delta_draws_all)) delta_draws_all[, predictor] else delta_draws_all
+  base_order <- result_base$d_order
+  base_log_bf <- bf10_interval_null_delta(
+    delta_draws = delta_draws,
+    d_order = base_order,
+    eps = eps,
+    return_log = TRUE
+  )$log_bf10[1]
+
+  out <- reweight_log_bf(
+    base_log_bf = base_log_bf,
+    delta_draws = delta_draws,
+    target_order = target_order,
+    base_order = base_order
+  )
+  out$predictor <- predictor
+  out$epsilon <- eps
+  out
+}
+
+
+# --- Linear point-null BF ---
 
 #' Compute analytical prior density at theta = 0
 #'
@@ -168,15 +231,14 @@ post0_theta_logspline <- function(theta_draws) {
 
 #' Compute BF10 table for all predictors (linear + nonlinear)
 #'
-#' For each predictor j:
-#'   - Linear BF10: Savage-Dickey ratio for theta_j = 0
-#'   - Nonlinear BF10: interval-null BF for delta_j < eps
+#' Linear effects use point-null Savage-Dickey ratios at theta = 0.
+#' Nonlinear effects use interval-null BFs for delta < eps with logspline.
 #'
 #' @param result A gp_fit object from fit_model()
-#' @param eps Epsilon threshold for nonlinear BF (scalar, default: 0 = point null)
+#' @param eps Interval-null threshold for nonlinear BF. Defaults to 0.2.
 #' @param p Optional vector of predictor indices to include
-#' @return data.frame with columns: predictor, log_bf10_linear, log_bf10_nonlinear
-compute_bf_table <- function(result, eps = 0, p = NULL) {
+#' @return data.frame with columns predictor, log_bf10_linear, log_bf10_nonlinear
+compute_bf_table <- function(result, eps = BF_EPSILON_DEFAULT, p = NULL) {
   stopifnot(inherits(result, "gp_fit"))
   stopifnot(result$model_type == "full")
 
@@ -188,7 +250,6 @@ compute_bf_table <- function(result, eps = 0, p = NULL) {
 
   if (is.null(p)) p_idx <- seq_len(P) else p_idx <- as.integer(p)
 
-  # --- Linear BF10: Savage-Dickey at theta = 0 ---
   prior0_theta <- prior0_theta_analytical(X)
   theta_draws <- post$theta
 
@@ -198,12 +259,15 @@ compute_bf_table <- function(result, eps = 0, p = NULL) {
 
   log_bf10_linear <- log(prior0_theta / post0_theta)
 
-  # --- Nonlinear BF10: interval-null for delta ---
   delta_draws <- post$delta
-
   log_bf10_nonlinear <- vapply(seq_len(P), function(j) {
     draws_j <- if (is.matrix(delta_draws)) delta_draws[, j] else delta_draws
-    bf <- bf10_interval_null_delta(draws_j, d_order, eps = eps, return_log = TRUE)
+    bf <- bf10_interval_null_delta(
+      delta_draws = draws_j,
+      d_order = d_order,
+      eps = eps,
+      return_log = TRUE
+    )
     bf$log_bf10[1]
   }, numeric(1))
 
@@ -216,6 +280,8 @@ compute_bf_table <- function(result, eps = 0, p = NULL) {
 
 
 #' Compute BF10 via bridge sampling (full model vs linear model)
+#'
+#' This is the direct-fit marginal-likelihood BF for the currently fitted prior.
 #'
 #' @param result_full gp_fit object from fit_model(..., model = "full")
 #' @param result_linear gp_fit object from fit_model(..., model = "linear")

@@ -17,5 +17,5 @@ cd "$TARGET"
 git add -A
 git diff --cached --quiet && echo "Nothing to sync." && exit 0
 git commit -m "Sync core code from phd-project-01"
-git push
+git push -u origin main
 echo "Done."

@@ -19,10 +19,6 @@ get_model <- function(
 ) {
   type <- match.arg(type)
 
-  if (!is.null(.compiled_models[[type]])) {
-    return(.compiled_models[[type]])
-  }
-
   stan_file <- switch(type,
     full       = "fit_full_model.stan",
     linear     = "fit_linear_model.stan",
@@ -31,10 +27,25 @@ get_model <- function(
 
   path <- file.path(model_path, stan_file)
   if (!file.exists(path)) stop("Stan file not found: ", path)
+  path_norm <- normalizePath(path, mustWork = TRUE)
+  path_mtime <- file.info(path_norm)$mtime
+
+  entry <- .compiled_models[[type]]
+  if (is.list(entry) &&
+      !is.null(entry$model) &&
+      identical(entry$path, path_norm) &&
+      identical(entry$mtime, path_mtime)) {
+    return(entry$model)
+  }
 
   message("Compiling Stan model: ", type, " ...")
-  .compiled_models[[type]] <- rstan::stan_model(file = path)
-  .compiled_models[[type]]
+  model_obj <- rstan::stan_model(file = path_norm)
+  .compiled_models[[type]] <- list(
+    model = model_obj,
+    path = path_norm,
+    mtime = path_mtime
+  )
+  model_obj
 }
 
 
@@ -280,11 +291,18 @@ fit_model_select <- function(
     .compiled_models_select <<- new.env(parent = emptyenv())
   }
   key <- normalizePath(stan_file, mustWork = TRUE)
-  if (is.null(.compiled_models_select[[key]])) {
+  key_mtime <- file.info(key)$mtime
+  entry <- .compiled_models_select[[key]]
+  if (!is.list(entry) ||
+      is.null(entry$model) ||
+      !identical(entry$mtime, key_mtime)) {
     message("Compiling Stan model (select): ", stan_file)
-    .compiled_models_select[[key]] <- rstan::stan_model(file = stan_file)
+    .compiled_models_select[[key]] <- list(
+      model = rstan::stan_model(file = key),
+      mtime = key_mtime
+    )
   }
-  stan_mod <- .compiled_models_select[[key]]
+  stan_mod <- .compiled_models_select[[key]]$model
 
   fit <- rstan::sampling(
     object = stan_mod,
