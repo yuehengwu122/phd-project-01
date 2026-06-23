@@ -1,4 +1,4 @@
-#' Job 01: N={20,50,100,200}, delta=0, local prior only with bridge BF
+#' Job 04: N={20,50,100,200}, delta=1, local prior only with bridge BF
 
 source("src/_setup.R")
 
@@ -6,19 +6,11 @@ library(bridgesampling)
 library(dplyr)
 library(readr)
 
-# ============================================
-# JOB-SPECIFIC SETTINGS
-# ============================================
-
-target_delta   <- 0L
+target_delta   <- 1L
 target_Ns      <- c(20L, 50L, 100L, 200L)
 target_d_order <- 0L
 order_label    <- "d0"
-job_tag        <- "job01_N_small_delta0_local"
-
-# ============================================
-# COMPUTE SETTINGS (4 parallel jobs)
-# ============================================
+job_tag        <- "job04_N_small_delta1_local"
 
 cpu_available <- parallel::detectCores(logical = TRUE)
 n_jobs        <- 4L
@@ -31,10 +23,6 @@ options(mc.cores = n_cores_use)
 
 message(sprintf("[%s] CPUs: %d | chains=%d | cores/job=%d",
                 job_tag, cpu_available, chains, n_cores_use))
-
-# ============================================
-# EXPERIMENT SETTINGS
-# ============================================
 
 sample_sizes   <- c(20L, 50L, 100L, 200L)
 n_replicates   <- 50L
@@ -52,10 +40,6 @@ seed_base      <- 123L
 
 SAVE_POSTERIOR_DRAWS <- TRUE
 
-# ============================================
-# PATHS
-# ============================================
-
 dir.create("data/simulated", recursive = TRUE, showWarnings = FALSE)
 
 bf_bridge_path   <- paste0("data/simulated/results_sim3_rstan_bf_bridge_", job_tag, ".csv")
@@ -67,10 +51,6 @@ stan_file_null <- "models/fit_linear_model.stan"
 
 if (!file.exists(stan_file)) stop("Stan file not found: ", stan_file)
 if (!file.exists(stan_file_null)) stop("Stan null model file not found: ", stan_file_null)
-
-# ============================================
-# HELPERS
-# ============================================
 
 make_stan_data_alt <- function(X, y, d_order = target_d_order) {
   X <- as.matrix(X)
@@ -90,10 +70,6 @@ append_csv <- function(df, path) {
   else readr::write_csv(df, path)
 }
 
-# ============================================
-# RESUME SUPPORT
-# ============================================
-
 completed_configs <- data.frame(
   delta_true = numeric(), N = integer(), order = character(), replicate = integer(),
   stringsAsFactors = FALSE
@@ -102,18 +78,10 @@ if (file.exists(completed_path)) {
   completed_configs <- readr::read_csv(completed_path, show_col_types = FALSE)
 }
 
-# ============================================
-# COMPILE RSTAN MODELS
-# ============================================
-
 message("Compiling alternative Stan model...")
 stan_mod_alt <- rstan::stan_model(stan_file)
 message("Compiling null Stan model...")
 stan_mod_null <- rstan::stan_model(stan_file_null)
-
-# ============================================
-# MAIN LOOP
-# ============================================
 
 total_configs <- length(target_Ns) * n_replicates
 counter <- 0L
@@ -135,7 +103,14 @@ for (k in rev(seq_len(length(sorted_Ns) - 1L))) {
 
 for (rep_id in seq_len(n_replicates)) {
   set.seed(seed_base + rep_id + 100000L * target_delta)
-  y_master <- rnorm(N_master, mean = 0, sd = sigma_fixed)
+  y_master <- generate_gp_data(
+    delta = target_delta,
+    lambda = lambda_fixed,
+    sigma = sigma_fixed,
+    N = N_master,
+    x = as.numeric(X_master),
+    n_samples = 1L
+  ) |> as.vector()
 
   for (N in target_Ns) {
     idx_sub <- idx_list[[as.character(N)]]
