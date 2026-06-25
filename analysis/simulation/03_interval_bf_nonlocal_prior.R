@@ -33,6 +33,7 @@ message(sprintf(
 # ============================================
 
 sample_sizes    <- c(20L, 50L, 100L, 200L)
+master_sample_size <- 1000L
 delta_values    <- c(0L, 1L, 2L, 3L)
 target_d_order  <- 0L
 order_label     <- "d0"
@@ -128,7 +129,7 @@ total_configs <- length(delta_values) * length(sample_sizes) * n_replicates
 counter <- 0L
 
 for (delta in delta_values) {
-  N_master <- max(sample_sizes)
+  N_master <- master_sample_size
   x_master_vec <- seq(x_min, x_max, length.out = N_master)
   X_master <- matrix(x_master_vec, ncol = 1)
 
@@ -154,7 +155,8 @@ for (delta in delta_values) {
         sigma = sigma_fixed,
         N = N_master,
         x = as.numeric(X_master),
-        n_samples = 1L
+        n_samples = 1L,
+        seed = seed_base + rep_id + 100000L * delta
       ) |> as.vector()
     }
 

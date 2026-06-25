@@ -25,6 +25,7 @@ message(sprintf("[%s] CPUs: %d | chains=%d | cores/job=%d",
                 job_tag, cpu_available, chains, n_cores_use))
 
 sample_sizes   <- c(20L, 50L, 100L, 200L)
+master_sample_size <- 1000L
 n_replicates   <- 50L
 
 lambda_fixed   <- 0.3
@@ -86,7 +87,7 @@ stan_mod_null <- rstan::stan_model(stan_file_null)
 total_configs <- length(target_Ns) * n_replicates
 counter <- 0L
 
-N_master <- max(sample_sizes)
+N_master <- master_sample_size
 x_master_vec <- seq(x_min, x_max, length.out = N_master)
 X_master <- matrix(x_master_vec, ncol = 1)
 
@@ -109,7 +110,8 @@ for (rep_id in seq_len(n_replicates)) {
     sigma = sigma_fixed,
     N = N_master,
     x = as.numeric(X_master),
-    n_samples = 1L
+    n_samples = 1L,
+    seed = seed_base + rep_id + 100000L * target_delta
   ) |> as.vector()
 
   for (N in target_Ns) {
