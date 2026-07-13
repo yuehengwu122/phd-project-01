@@ -168,10 +168,10 @@ compute_reweighted_nonlinear_bf <- function(
   stopifnot(inherits(result_base, "gp_fit"))
 
   post <- rstan::extract(result_base$fit)
-  delta_draws_all <- post$delta
+  delta_draws_all <- extract_gp_draws_full(result_base, post = post, param = "delta")
   predictor <- as.integer(predictor)
 
-  delta_draws <- if (is.matrix(delta_draws_all)) delta_draws_all[, predictor] else delta_draws_all
+  delta_draws <- delta_draws_all[, predictor]
   base_order <- result_base$d_order
   base_log_bf <- bf10_interval_null_delta(
     delta_draws = delta_draws,
@@ -196,24 +196,24 @@ compute_reweighted_nonlinear_bf <- function(
 
 #' Compute analytical prior density at theta = 0
 #'
-#' Under the mixture-of-g prior:
+#' Under the inverse-gamma prior from the paper:
 #'   theta | g ~ N(0, g * (X'X)^{-1})
-#'   log(g) ~ N(log(N), 0.5^2)
+#'   g ~ IG(a = 2, b = N / 2)
 #'
 #' @param X Scaled predictor matrix (as passed to Stan)
-#' @param mu_log_g Prior mean of log(g) (default: log(N))
-#' @param sd_log_g Prior SD of log(g) (default: 0.5)
+#' @param ig_a Inverse-gamma shape parameter for g (default: 2)
+#' @param ig_b Inverse-gamma scale parameter for g (default: N / 2)
 #' @return Vector of prior densities at zero, one per predictor
 prior0_theta_analytical <- function(
   X,
-  mu_log_g = log(nrow(X)),
-  sd_log_g = 0.5
+  ig_a = 2,
+  ig_b = 0.5 * nrow(X)
 ) {
   X_c <- scale(X, center = TRUE, scale = FALSE)
   XtX_inv <- solve(crossprod(X_c))
   v <- diag(XtX_inv)
-  Eg_inv_sqrt_g <- exp(-0.5 * mu_log_g + 0.125 * sd_log_g^2)
-  (1 / sqrt(2 * pi * v)) * Eg_inv_sqrt_g
+  scale_theta <- sqrt((ig_b * v) / ig_a)
+  stats::dt(0, df = 2 * ig_a) / scale_theta
 }
 
 
@@ -240,36 +240,43 @@ post0_theta_logspline <- function(theta_draws) {
 #' @return data.frame with columns predictor, log_bf10_linear, log_bf10_nonlinear
 compute_bf_table <- function(result, eps = BF_EPSILON_DEFAULT, p = NULL) {
   stopifnot(inherits(result, "gp_fit"))
-  stopifnot(result$model_type == "full")
+  stopifnot(is_gp_full_fit(result))
 
   post <- rstan::extract(result$fit)
   X <- result$stan_data$X
   P <- result$stan_data$P
   d_order <- result$d_order
   pred_names <- result$predictor_names
+  masks <- get_gp_fit_masks(result)
 
   if (is.null(p)) p_idx <- seq_len(P) else p_idx <- as.integer(p)
 
-  prior0_theta <- prior0_theta_analytical(X)
-  theta_draws <- post$theta
+  linear_idx <- which(masks$linear == 1L)
+  nonlinear_idx <- which(masks$nonlinear == 1L)
 
-  post0_theta <- vapply(seq_len(P), function(j) {
-    post0_theta_logspline(theta_draws[, j])
-  }, numeric(1))
+  log_bf10_linear <- rep(NA_real_, P)
+  if (length(linear_idx) > 0L) {
+    prior0_theta_active <- prior0_theta_analytical(X[, linear_idx, drop = FALSE])
+    theta_draws <- extract_gp_draws_full(result, post = post, param = "theta")
+    post0_theta_active <- vapply(linear_idx, function(j) {
+      post0_theta_logspline(theta_draws[, j])
+    }, numeric(1))
+    log_bf10_linear[linear_idx] <- log(prior0_theta_active / post0_theta_active)
+  }
 
-  log_bf10_linear <- log(prior0_theta / post0_theta)
-
-  delta_draws <- post$delta
-  log_bf10_nonlinear <- vapply(seq_len(P), function(j) {
-    draws_j <- if (is.matrix(delta_draws)) delta_draws[, j] else delta_draws
-    bf <- bf10_interval_null_delta(
-      delta_draws = draws_j,
-      d_order = d_order,
-      eps = eps,
-      return_log = TRUE
-    )
-    bf$log_bf10[1]
-  }, numeric(1))
+  log_bf10_nonlinear <- rep(NA_real_, P)
+  if (length(nonlinear_idx) > 0L) {
+    delta_draws <- extract_gp_draws_full(result, post = post, param = "delta")
+    log_bf10_nonlinear[nonlinear_idx] <- vapply(nonlinear_idx, function(j) {
+      bf <- bf10_interval_null_delta(
+        delta_draws = delta_draws[, j],
+        d_order = d_order,
+        eps = eps,
+        return_log = TRUE
+      )
+      bf$log_bf10[1]
+    }, numeric(1))
+  }
 
   data.frame(
     predictor = pred_names[p_idx],

@@ -4,24 +4,35 @@
     "type": "split",
     "children": [
       {
-        "id": "23ff0358bc55b322",
+        "id": "539fb3e4539da3a0",
         "type": "tabs",
         "children": [
           {
-            "id": "ff3b6fcef55cb315",
+            "id": "f21380dd0bb10f58",
+            "type": "leaf",
+            "state": {
+              "type": "full-calendar-view",
+              "state": {},
+              "icon": "calendar-glyph",
+              "title": "Calendar"
+            }
+          },
+          {
+            "id": "1e51135ce9d264e6",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01 Daily Log/2026-06.md",
+                "file": "01 Daily Log/week28 Jul6-12.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "2026-06"
+              "title": "week28 Jul6-12"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -177,22 +188,32 @@
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
       "canvas:Create new canvas": false,
-      "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "obsidian-full-calendar:Open Full Calendar": false
     }
   },
-  "active": "ff3b6fcef55cb315",
+  "active": "1e51135ce9d264e6",
   "lastOpenFiles": [
+    "00 Project Home/writing todo.md",
+    "01 Daily Log/week28 Jul6-12.md",
+    "00 Project Home/project2_idea_hsgp_bf.md",
+    "01 Daily Log/_workflow.md",
+    "Template/_template_week.md",
+    "2026-07-08.md",
+    "Template",
+    "01 Daily Log/2026-06.md",
+    "00 Project Home/P&TD conversation.md",
+    "02 Experiment Log/260528_ARD_alternative.md",
+    "00 Project Home/Untitled.md",
+    "02 Experiment Log/260605_delta_reparameterization.md",
     "02 Experiment Log/Untitled.md",
+    "02 Experiment Log/260601_reweighting_delta.md",
     "BF vs SDR, fitting with one parameter fixed, range of length-scale.md",
     "Bridge Sampling vs. Importance Sampling.md",
     "Welcome.md",
     "Week25.md",
-    "week 33.md",
-    "02 Experiment Log/260605_delta_reparameterization.md",
-    "02 Experiment Log/260601_reweighting_delta.md",
-    "00 Project Home/project2_idea_hsgp_bf.md"
+    "week 33.md"
   ]
 }

@@ -5,21 +5,22 @@
 // This is the full interaction model with delta_main = 0 (f_main removed):
 //
 //   y_i = beta_0 + beta_1 x_i + z_i f_int(x_i) + eps_i
-//   f_int ~ GP(0, sigma^2 delta_int^2 K~^*_{lambda_int})
+//   f_int ~ GP(0, P_perp K_int P_perp)
 //   eps_i ~ N(0, sigma^2)
 //
-// K~^*_int is orthogonalized against span{1, x_c} and trace-normalized so
-// delta_int measures the projected interaction SD on the response scale.
+// K_int is built with amplitude alpha_int = sigma * delta_int, then
+// orthogonalized against span{1, x_c}.
 // =============================================================================
 
 functions {
-  matrix se_kernel_unit(matrix D2, real l, real nugget) {
+  matrix se_kernel(matrix D2, real alpha, real l, real nugget) {
     int N = rows(D2);
+    real a2 = square(alpha);
     real inv_l2 = inv(square(l));
-    matrix[N, N] R = exp(-0.5 * inv_l2 * D2);
+    matrix[N, N] K = a2 * exp(-0.5 * inv_l2 * D2);
     for (n in 1:N)
-      R[n, n] = 1.0 + nugget;
-    return R;
+      K[n, n] = a2 + nugget;
+    return K;
   }
 }
 
@@ -80,6 +81,7 @@ parameters {
 
 transformed parameters {
   real theta = exp(0.5 * log_g_theta) * sd_theta_base * z_theta;
+  real<lower=0> alpha_int = sigma * delta_int;
   real beta1 = sigma * theta;
 
   real lprior = 0;
@@ -108,25 +110,18 @@ model {
   target += lprior;
   z_theta ~ normal(0, 1);
 
-  matrix[N, N] R_int = se_kernel_unit(D2, lambda_int, 1e-8);
-  matrix[N, R_cols] U_int = R_int * Q_Z;
+  matrix[N, N] K_int = se_kernel(D2, alpha_int, lambda_int, 1e-8);
+  matrix[N, R_cols] U_int = K_int * Q_Z;
   matrix[R_cols, R_cols] M_int = Q_Z' * U_int;
-  matrix[N, N] Ktilde_int = R_int
+  matrix[N, N] Ktilde_int = K_int
                             - U_int * Q_Z'
                             - Q_Z * U_int'
                             + Q_Z * M_int * Q_Z';
 
-  real tr_int = 0;
-  for (n in 1:N)
-    tr_int += square(z[n]) * Ktilde_int[n, n];
-  real c_int = tr_int / N;
-  real c_int_safe = fmax(c_int, 1e-10);
-  real w_int = square(sigma * delta_int) / c_int_safe;
-
   matrix[N, N] Sigma;
   for (i in 1:N)
     for (j in 1:N)
-      Sigma[i, j] = w_int * z[i] * Ktilde_int[i, j] * z[j];
+      Sigma[i, j] = z[i] * Ktilde_int[i, j] * z[j];
 
   {
     real s2 = square(sigma);

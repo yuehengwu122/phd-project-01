@@ -214,6 +214,206 @@ generate_gp_data <- function(
   rstan::extract(simu_fit)$y
 }
 
+
+#' Simulate GP draws in R with optional orthogonalization
+#'
+#' This mirrors the model definition in fit_full_model.stan when
+#' orthogonalize = TRUE: the latent GP draw is projected onto the
+#' orthogonal complement of span{1, x_c}, so the resulting nonlinear
+#' component contains no intercept or linear trend.
+#'
+#' @param x Covariate values
+#' @param delta Nonlinear magnitude parameter
+#' @param lambda GP lengthscale parameter
+#' @param sigma Residual scale parameter used in alpha = delta * sigma
+#' @param n_draws Number of latent function draws
+#' @param orthogonalize If TRUE, project draws to the nonlinear subspace
+#' @param beta0 Linear intercept added to the returned mean function
+#' @param beta1 Linear slope(s); scalar for univariate x, vector otherwise
+#' @param add_noise If TRUE, add Gaussian noise with sd = sigma to y
+#' @param seed Optional random seed
+#' @param nugget Small diagonal jitter for numerical stability
+#' @return List with x, mu, f_raw, f, and y
+simulate_gp_draws <- function(
+  x,
+  delta,
+  lambda,
+  sigma,
+  n_draws = 1L,
+  orthogonalize = FALSE,
+  beta0 = 0,
+  beta1 = 0,
+  add_noise = FALSE,
+  seed = NULL,
+  nugget = 1e-10
+) {
+  x_mat <- as.matrix(x)
+  if (is.vector(x_mat)) x_mat <- matrix(x_mat, ncol = 1)
+
+  N <- nrow(x_mat)
+  P <- ncol(x_mat)
+
+  if (!is.null(seed)) set.seed(seed)
+
+  x_c <- scale(x_mat, center = TRUE, scale = FALSE)
+  x_vec <- as.numeric(x_mat[, 1])
+  alpha <- delta * sigma
+
+  D2 <- outer(x_vec, x_vec, FUN = function(a, b) (a - b)^2)
+  K <- alpha^2 * exp(-0.5 * D2 / lambda^2)
+  diag(K) <- diag(K) + nugget
+
+  R <- chol(K)
+  z <- matrix(stats::rnorm(n_draws * N), nrow = n_draws, ncol = N)
+  f_raw <- z %*% R
+
+  f_nl <- f_raw
+  if (orthogonalize) {
+    Z_aug <- cbind(1, x_c)
+    Q_Z <- qr.Q(qr(Z_aug))
+    f_nl <- f_raw - (f_raw %*% Q_Z) %*% t(Q_Z)
+  }
+
+  beta1 <- rep(beta1, length.out = P)
+  mu_vec <- as.numeric(beta0 + x_c %*% beta1)
+  mu <- matrix(mu_vec, nrow = n_draws, ncol = N, byrow = TRUE)
+
+  y <- mu + f_nl
+  if (add_noise) {
+    y <- y + matrix(stats::rnorm(n_draws * N, sd = sigma), nrow = n_draws, ncol = N)
+  }
+
+  list(
+    x = x_mat,
+    mu = mu,
+    f_raw = f_raw,
+    f = f_nl,
+    y = y
+  )
+}
+
+
+#' Generate orthogonalized GP data
+#'
+#' Convenience wrapper for the univariate case used in prior-elicitation
+#' plots: beta0 = 0 and beta1 = 0, with the nonlinear component projected
+#' onto the orthogonal complement of span{1, x_c}.
+#'
+#' @param delta Nonlinear magnitude parameter
+#' @param lambda GP lengthscale parameter
+#' @param sigma Noise standard deviation
+#' @param N Sample size
+#' @param x Covariate values (vector of length N)
+#' @param n_samples Number of datasets to generate
+#' @param seed Random seed
+#' @param add_noise If TRUE, add Gaussian noise with sd = sigma
+#' @param return_latent If TRUE, return latent components as well
+#' @return Matrix of y values, or a full list when return_latent = TRUE
+generate_orthogonalized_gp_data <- function(
+  delta, lambda, sigma, N, x,
+  n_samples = 1L,
+  seed = 30L,
+  add_noise = TRUE,
+  return_latent = FALSE
+) {
+  sim <- simulate_gp_draws(
+    x = x,
+    delta = delta,
+    lambda = lambda,
+    sigma = sigma,
+    n_draws = n_samples,
+    orthogonalize = TRUE,
+    beta0 = 0,
+    beta1 = 0,
+    add_noise = add_noise,
+    seed = seed
+  )
+
+  if (return_latent) return(sim)
+  sim$y
+}
+
+
+#' Simulate from the projected-and-standardized GP parameterization
+#'
+#' This matches fit_full_model_projected_scaled.stan. The unit-amplitude
+#' kernel is first projected to the orthogonal complement of span{1, x_c},
+#' then rescaled so that trace(K_tilde_std) / N = 1. Under this
+#' parameterization, delta controls the projected RMS on the latent scale.
+#'
+#' @param x Covariate values
+#' @param delta Projected nonlinear magnitude parameter
+#' @param lambda GP lengthscale parameter
+#' @param sigma Residual scale parameter
+#' @param n_draws Number of latent function draws
+#' @param beta0 Linear intercept
+#' @param beta1 Linear slope(s)
+#' @param add_noise If TRUE, add Gaussian noise with sd = sigma to y
+#' @param seed Optional random seed
+#' @param nugget Small diagonal jitter
+#' @return List with x, mu, f, y, and scale_factor
+simulate_projected_scaled_gp_draws <- function(
+  x,
+  delta,
+  lambda,
+  sigma,
+  n_draws = 1L,
+  beta0 = 0,
+  beta1 = 0,
+  add_noise = FALSE,
+  seed = NULL,
+  nugget = 1e-10
+) {
+  x_mat <- as.matrix(x)
+  if (is.vector(x_mat)) x_mat <- matrix(x_mat, ncol = 1)
+
+  N <- nrow(x_mat)
+  P <- ncol(x_mat)
+
+  if (!is.null(seed)) set.seed(seed)
+
+  x_c <- scale(x_mat, center = TRUE, scale = FALSE)
+  x_vec <- as.numeric(x_mat[, 1])
+  Z_aug <- cbind(1, x_c)
+  Q_Z <- qr.Q(qr(Z_aug))
+  P_perp <- diag(N) - Q_Z %*% t(Q_Z)
+
+  D2 <- outer(x_vec, x_vec, FUN = function(a, b) (a - b)^2)
+  R_lambda <- exp(-0.5 * D2 / lambda^2)
+  diag(R_lambda) <- diag(R_lambda) + nugget
+
+  K_proj <- P_perp %*% R_lambda %*% P_perp
+  scale_factor <- sum(diag(K_proj)) / N
+  if (!is.finite(scale_factor) || scale_factor <= 0) {
+    stop("Projected kernel scale factor is non-positive.")
+  }
+
+  K_std <- K_proj / scale_factor
+  K_latent <- (sigma * delta)^2 * K_std
+  K_latent <- 0.5 * (K_latent + t(K_latent))
+
+  R <- chol(K_latent + diag(1e-12, N))
+  z <- matrix(stats::rnorm(n_draws * N), nrow = n_draws, ncol = N)
+  f <- z %*% R
+
+  beta1 <- rep(beta1, length.out = P)
+  mu_vec <- as.numeric(beta0 + x_c %*% beta1)
+  mu <- matrix(mu_vec, nrow = n_draws, ncol = N, byrow = TRUE)
+
+  y <- mu + f
+  if (add_noise) {
+    y <- y + matrix(stats::rnorm(n_draws * N, sd = sigma), nrow = n_draws, ncol = N)
+  }
+
+  list(
+    x = x_mat,
+    mu = mu,
+    f = f,
+    y = y,
+    scale_factor = scale_factor
+  )
+}
+
 # ============================================================
 # fit_model_select: GP regression with per-predictor selection
 #
@@ -349,4 +549,95 @@ fit_model_select <- function(
   )
   class(result) <- c("gp_fit_select", "gp_fit")
   result
+}
+
+
+# ============================================================
+# Helpers for downstream utilities
+# ============================================================
+
+#' Check whether a gp_fit object has GP terms available
+#'
+#' @param result A gp_fit-like object
+#' @return TRUE for full GP fits, including selection fits
+is_gp_full_fit <- function(result) {
+  inherits(result, "gp_fit") &&
+    isTRUE(result$model_type %in% c("full", "full_select"))
+}
+
+
+#' Get the active linear/nonlinear inclusion masks for a fit
+#'
+#' @param result A gp_fit object
+#' @return Named list with integer vectors `linear` and `nonlinear`
+get_gp_fit_masks <- function(result) {
+  stopifnot(inherits(result, "gp_fit"))
+
+  P <- result$stan_data$P
+
+  linear_mask <- result$include_linear
+  nonlinear_mask <- result$include_nonlinear
+
+  if (is.null(linear_mask)) linear_mask <- rep(1L, P)
+  if (is.null(nonlinear_mask)) nonlinear_mask <- rep(1L, P)
+
+  list(
+    linear = as.integer(linear_mask),
+    nonlinear = as.integer(nonlinear_mask)
+  )
+}
+
+
+#' Coerce posterior draws to a draws x P matrix
+#'
+#' @param x Posterior draws, matrix or vector
+#' @param P Number of predictors
+#' @return Numeric matrix with `P` columns
+as_gp_draw_matrix <- function(x, P) {
+  if (is.null(dim(x))) {
+    matrix(as.numeric(x), ncol = P)
+  } else {
+    as.matrix(x)
+  }
+}
+
+
+#' Extract full-length posterior draws for a model parameter
+#'
+#' For `full_select` fits, reduced parameters are expanded to length `P`
+#' using generated quantities so downstream summaries can index by the
+#' original predictor positions.
+#'
+#' @param result A gp_fit object
+#' @param post Optional posterior list from `rstan::extract(result$fit)`
+#' @param param One of "theta", "beta1", "delta", or "lambda"
+#' @return Numeric matrix with one column per original predictor
+extract_gp_draws_full <- function(result, post = NULL, param = c("theta", "beta1", "delta", "lambda")) {
+  stopifnot(inherits(result, "gp_fit"))
+  param <- match.arg(param)
+
+  if (is.null(post)) post <- rstan::extract(result$fit)
+  P <- result$stan_data$P
+
+  if (identical(result$model_type, "full_select")) {
+    if (param == "theta") {
+      beta1_full <- as_gp_draw_matrix(post$beta1, P)
+      return(sweep(beta1_full, 1, post$sigma, "/"))
+    }
+    if (param == "beta1") {
+      return(as_gp_draw_matrix(post$beta1, P))
+    }
+    if (param == "delta") {
+      return(as_gp_draw_matrix(post$delta_full, P))
+    }
+    if (param == "lambda") {
+      return(as_gp_draw_matrix(post$lambda_full, P))
+    }
+  }
+
+  if (param == "beta1" && !is.null(post$beta1)) {
+    return(as_gp_draw_matrix(post$beta1, P))
+  }
+
+  as_gp_draw_matrix(post[[param]], P)
 }

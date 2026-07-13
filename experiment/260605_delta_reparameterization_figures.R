@@ -29,8 +29,8 @@ lambda_vals_rms <- c(0.15, 0.3, 0.6)
 delta_vals_fig1 <- c(0, 1, 2, 3)
 lambda_vals_fig1 <- c(0.15, 0.25, 0.4)
 
-seed_base_old <- 260605L
-seed_base_fig1 <- 260611L
+seed_base_old <- 12
+seed_base_fig1 <- 12
 
 theme_gp <- function() {
   theme_bw(base_size = 11) +
@@ -132,7 +132,10 @@ plot_df <- bind_rows(plot_df) |>
     lambda = factor(lambda, levels = paste0("lambda = ", lambda_vals_old))
   )
 
-p_raw_vs_orth <- ggplot(plot_df, aes(x = x, y = value, group = interaction(draw, type), color = draw)) +
+p_raw_vs_orth <- ggplot(
+  plot_df,
+  aes(x = x, y = value, group = interaction(draw, type), color = draw)
+) +
   geom_hline(yintercept = 0, linewidth = 0.3, color = "grey65") +
   geom_line(linewidth = 0.8, alpha = 0.9, show.legend = FALSE) +
   facet_grid(delta ~ lambda + type, scales = "fixed") +
@@ -147,7 +150,11 @@ p_raw_vs_orth <- ggplot(plot_df, aes(x = x, y = value, group = interaction(draw,
 
 ggsave(
   file.path(report_dir, "260605_raw_vs_orthogonalized_gp.png"),
-  p_raw_vs_orth, width = 14, height = 6, dpi = 220, bg = "white"
+  p_raw_vs_orth,
+  width = 14,
+  height = 6,
+  dpi = 220,
+  bg = "white"
 )
 
 # ============================================================
@@ -208,7 +215,10 @@ for (delta in delta_vals_old) {
 
 decomp_df <- bind_rows(decomp_df) |>
   mutate(
-    component = factor(component, levels = c("Raw draw", "Projected linear part", "Orthogonal residual")),
+    component = factor(
+      component,
+      levels = c("Raw draw", "Projected linear part", "Orthogonal residual")
+    ),
     delta = factor(delta, levels = paste0("delta = ", delta_vals_old)),
     lambda = factor(lambda, levels = paste0("lambda = ", lambda_vals_old))
   )
@@ -217,11 +227,13 @@ p_decomp <- ggplot(decomp_df, aes(x = x, y = value, color = component)) +
   geom_hline(yintercept = 0, linewidth = 0.3, color = "grey65") +
   geom_line(linewidth = 0.9) +
   facet_grid(delta ~ lambda) +
-  scale_color_manual(values = c(
-    "Raw draw" = "#404040",
-    "Projected linear part" = "#C75146",
-    "Orthogonal residual" = "#2E5AAC"
-  )) +
+  scale_color_manual(
+    values = c(
+      "Raw draw" = "#404040",
+      "Projected linear part" = "#C75146",
+      "Orthogonal residual" = "#2E5AAC"
+    )
+  ) +
   labs(
     title = "Decomposition of a raw GP draw",
     subtitle = "Each raw draw is split into its projection onto span{1, x_c} and its orthogonal residual",
@@ -234,7 +246,11 @@ p_decomp <- ggplot(decomp_df, aes(x = x, y = value, color = component)) +
 
 ggsave(
   file.path(report_dir, "260605_raw_gp_decomposition.png"),
-  p_decomp, width = 10, height = 6, dpi = 220, bg = "white"
+  p_decomp,
+  width = 10,
+  height = 6,
+  dpi = 220,
+  bg = "white"
 )
 
 # ============================================================
@@ -247,9 +263,17 @@ summary_df <- expand.grid(
   stringsAsFactors = FALSE
 ) |>
   mutate(
-    old_rms = mapply(expected_projected_rms_old, MoreArgs = list(x = x_grid, sigma = sigma_fixed),
-                     delta = delta, lambda = lambda),
-    new_rms = mapply(expected_projected_rms_new, delta = delta, sigma = sigma_fixed)
+    old_rms = mapply(
+      expected_projected_rms_old,
+      MoreArgs = list(x = x_grid, sigma = sigma_fixed),
+      delta = delta,
+      lambda = lambda
+    ),
+    new_rms = mapply(
+      expected_projected_rms_new,
+      delta = delta,
+      sigma = sigma_fixed
+    )
   ) |>
   pivot_longer(
     cols = c(old_rms, new_rms),
@@ -262,17 +286,30 @@ summary_df <- expand.grid(
       old_rms = "Current delta definition",
       new_rms = "Projected-scaled delta definition"
     ),
-    delta_label = factor(paste0("delta = ", delta), levels = paste0("delta = ", delta_vals_rms))
+    delta_label = factor(
+      paste0("delta = ", delta),
+      levels = paste0("delta = ", delta_vals_rms)
+    )
   )
 
-p_rms <- ggplot(summary_df, aes(x = lambda, y = expected_rms, color = parameterization, group = parameterization)) +
+p_rms <- ggplot(
+  summary_df,
+  aes(
+    x = lambda,
+    y = expected_rms,
+    color = parameterization,
+    group = parameterization
+  )
+) +
   geom_line(linewidth = 0.9) +
   geom_point(size = 2) +
   facet_wrap(~delta_label, nrow = 1) +
-  scale_color_manual(values = c(
-    "Current delta definition" = "#C75146",
-    "Projected-scaled delta definition" = "#2E5AAC"
-  )) +
+  scale_color_manual(
+    values = c(
+      "Current delta definition" = "#C75146",
+      "Projected-scaled delta definition" = "#2E5AAC"
+    )
+  ) +
   labs(
     title = "Projected nonlinear RMS under old and new delta definitions",
     subtitle = "Under the projected-scaled parameterization, delta targets the final projected nonlinear magnitude",
@@ -285,7 +322,11 @@ p_rms <- ggplot(summary_df, aes(x = lambda, y = expected_rms, color = parameteri
 
 ggsave(
   file.path(report_dir, "260605_projected_scaled_rms_comparison.png"),
-  p_rms, width = 10, height = 4.5, dpi = 220, bg = "white"
+  p_rms,
+  width = 10,
+  height = 4.5,
+  dpi = 220,
+  bg = "white"
 )
 
 # ============================================================
@@ -348,13 +389,26 @@ for (delta in c(1, 2)) {
 
 draw_df <- bind_rows(draw_df) |>
   mutate(
-    parameterization = factor(parameterization,
-                              levels = c("Current delta definition", "Projected-scaled delta definition")),
+    parameterization = factor(
+      parameterization,
+      levels = c(
+        "Current delta definition",
+        "Projected-scaled delta definition"
+      )
+    ),
     delta = factor(delta, levels = paste0("delta = ", c(1, 2))),
     lambda = factor(lambda, levels = paste0("lambda = ", lambda_vals_rms))
   )
 
-p_draws <- ggplot(draw_df, aes(x = x, y = value, color = draw, group = interaction(draw, parameterization))) +
+p_draws <- ggplot(
+  draw_df,
+  aes(
+    x = x,
+    y = value,
+    color = draw,
+    group = interaction(draw, parameterization)
+  )
+) +
   geom_hline(yintercept = 0, linewidth = 0.3, color = "grey65") +
   geom_line(linewidth = 0.8, alpha = 0.9, show.legend = FALSE) +
   facet_grid(delta ~ lambda + parameterization, scales = "fixed") +
@@ -369,7 +423,11 @@ p_draws <- ggplot(draw_df, aes(x = x, y = value, color = draw, group = interacti
 
 ggsave(
   file.path(report_dir, "260605_projected_scaled_draw_comparison.png"),
-  p_draws, width = 14, height = 6, dpi = 220, bg = "white"
+  p_draws,
+  width = 14,
+  height = 6,
+  dpi = 220,
+  bg = "white"
 )
 
 # ============================================================
@@ -418,15 +476,23 @@ p_fig1 <- ggplot(fig1_df, aes(x = x, y = value, color = draw, group = draw)) +
   facet_grid(delta ~ lambda, scales = "fixed") +
   scale_color_manual(values = c("#0B6E4F", "#C75146", "#2E5AAC", "#8E6C88")) +
   labs(
-    title = "Projected nonlinear prior draws under the redefined delta",
-    subtitle = "Each panel shows latent draws after projection and standardization; delta now targets the final nonlinear magnitude",
     x = "x",
     y = "latent nonlinear function"
   ) +
-  coord_cartesian(ylim = c(-10, 10)) +
-  theme_gp()
+  coord_cartesian(ylim = c(-8, 8)) +
+  theme_gp() +
+  theme(
+    plot.title = element_blank(),
+    plot.subtitle = element_blank(),
+    strip.text = element_text(face = "bold", size = 11),
+    axis.title = element_text(size = 12)
+  )
 
 ggsave(
   file.path(report_dir, "260605_projected_scaled_figure1_like.png"),
-  p_fig1, width = 10.5, height = 9.2, dpi = 220, bg = "white"
+  p_fig1,
+  width = 10.5,
+  height = 9.2,
+  dpi = 220,
+  bg = "white"
 )

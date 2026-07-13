@@ -74,3 +74,9 @@ If context is needed, read these files first before making substantive suggestio
 - Do not assume the current obstacle is only technical; some tasks may be waiting on supervisor input or long-running computation.
 - Do not treat missing structure in notes as permission to replace them with a generic productivity system.
 - Do not move or rename directories as a cleanup step unless the user explicitly requests it.
+
+## Personal Daily Log
+
+For the personal daily-log workflow in this repo, see:
+- `obsidian/01 Daily Log/_workflow.md`
+- `obsidian/Template/_template_week.md`

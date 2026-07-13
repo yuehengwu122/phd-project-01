@@ -60,7 +60,17 @@ cat("Bridge sampling log BF10 (d2):", compute_bf_bridge(fit_d2, fit_lin, log = T
 plot_posterior_delta(fit_d0, bins = 50, plot_prior = TRUE, ylim = c(0, 0.8))
 plot_posterior_theta(fit_d0, bins = 50, plot_prior = TRUE, ylim = c(0, 1.6))
 
-plot_gp_trends(fit_d0, title = "GP Trends (local prior, d=0)", ylim = c(-2, 3))
+plot_trends_d0 <- plot_gp_trends(
+  fit_d0,
+  title = "GP Trends (local prior, d=0)",
+  ylim = c(-2, 3)
+)
+ggplot2::ggsave(
+  "results/gp_trends_03_diabetes_d0.png",
+  plot_trends_d0,
+  width = 11,
+  height = 6
+)
 plot_gp_trends(fit_d2, title = "GP Trends (moment prior, d=2)", ylim = c(-2, 3))
 
 # --- Save ---

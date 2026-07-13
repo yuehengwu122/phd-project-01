@@ -32,11 +32,6 @@ df |>
 fit_d0 <- fit_model(X, y, model = "full", d_order = 0,
                      chains = 2, iter = 5500, warmup = 500)
 
-fit_ig <- fit_model(X, y, model = "full_ig", d_order = 0,
-                    ig_a = 2.0,     # ig_b defaults to 0.5 * N
-                    chains = 2, iter = 5500, warmup = 500)
-saveRDS(fit_ig, "results/fit_04_boston_ig.rds")
-
 
 # --- Fit: non-local prior order 2 ---
 fit_d2 <- fit_model(X, y, model = "full", d_order = 2,
@@ -69,7 +64,17 @@ saveRDS(fit_d0,  "results/fit_04_boston_d0.rds")
 saveRDS(fit_d2,  "results/fit_04_boston_d2.rds")
 saveRDS(fit_lin, "results/fit_04_boston_linear.rds")
 
-
+plot_trends_d0 <- plot_gp_trends(
+  fit_full,
+  title = "GP Trends (local prior, d=0)",
+  ylim = c(-2, 3)
+)
+ggplot2::ggsave(
+  "results/gp_trends_04_boston_housing_d0.png",
+  plot_trends_d0,
+  width = 11,
+  height = 6
+)
 
 
 

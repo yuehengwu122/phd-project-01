@@ -1,17 +1,18 @@
 functions {
   /**
-   * Unit-amplitude SE kernel from precomputed squared distances.
+   * Build SE kernel from precomputed squared-distance matrix D2.
    *
-   * R[i,j] = exp(-0.5 * D2[i,j] / l^2)  for i != j
-   * R[i,i] = 1 + nugget
+   * K[i,j] = alpha^2 * exp(-0.5 * D2[i,j] / l^2)  for i != j
+   * K[i,i] = alpha^2 + nugget
    */
-  matrix se_kernel_unit(matrix D2, real l, real nugget) {
+  matrix se_kernel(matrix D2, real alpha, real l, real nugget) {
     int N = rows(D2);
+    real a2 = square(alpha);
     real inv_l2 = inv(square(l));
-    matrix[N, N] R = exp(-0.5 * inv_l2 * D2);
+    matrix[N, N] K = a2 * exp(-0.5 * inv_l2 * D2);
     for (n in 1:N)
-      R[n, n] = 1.0 + nugget;
-    return R;
+      K[n, n] = a2 + nugget;
+    return K;
   }
 }
 
@@ -78,6 +79,7 @@ parameters {
 
 transformed parameters {
   vector[P] theta = exp(0.5 * log_g_theta) * (L_V_theta_base * z_theta);
+  vector<lower=0>[P] alpha = delta * sigma;
   vector[P] beta1 = sigma * theta;
 
   real lprior = 0;
@@ -116,26 +118,21 @@ model {
   z_theta ~ normal(0, 1);
 
   int R = R_cols;
-  matrix[N, N] S_R = rep_matrix(0.0, N, N);
+  matrix[N, N] S_K = rep_matrix(0.0, N, N);
   matrix[N, R] S_U = rep_matrix(0.0, N, R);
   matrix[R, R] S_M = rep_matrix(0.0, R, R);
 
   for (j in 1:P) {
-    matrix[N, N] Rj = se_kernel_unit(D2[j], lambda[j], 1e-8);
-    matrix[N, R] Uj = Rj * Q_Z;
+    matrix[N, N] Kj = se_kernel(D2[j], alpha[j], lambda[j], 1e-8);
+    matrix[N, R] Uj = Kj * Q_Z;
     matrix[R, R] Mj = Q_Z' * Uj;
 
-    real tr_proj = trace(Rj) - trace(Mj);
-    real c_j = tr_proj / N;
-    real c_safe = fmax(c_j, 1e-10);
-    real w_j = square(sigma * delta[j]) / c_safe;
-
-    S_R += w_j * Rj;
-    S_U += w_j * Uj;
-    S_M += w_j * Mj;
+    S_K += Kj;
+    S_U += Uj;
+    S_M += Mj;
   }
 
-  matrix[N, N] Sigma = S_R
+  matrix[N, N] Sigma = S_K
                         - S_U * Q_Z'
                         - Q_Z * S_U'
                         + Q_Z * S_M * Q_Z';
